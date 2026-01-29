@@ -13,7 +13,7 @@ tested in Python 3.11
 # Imports
 # ==============================
 import pygame, sys, serial, zipfile
-from random import shuffle
+from random import shuffle, randint
 from pathlib import Path
 from datetime import datetime
 from tempfile import TemporaryDirectory
@@ -28,9 +28,11 @@ from pygame.locals import (
     K_ESCAPE,
     QUIT,
     Color,
-    K_p,
+    K_c,
     K_v,
-    K_n
+    K_b,
+    K_n,
+    K_p
 )
 
 # ==============================
@@ -54,6 +56,32 @@ DEBUG_DIR.mkdir(exist_ok=True)
 FullScreenShow = True  # Automatically start in fullscreen mode
 test_name = "Wisconsin Task"
 date_name = strftime("%Y-%m-%d_%H-%M-%S", gmtime())
+
+# Port address and triggers
+lpt_address = 0xD100
+trigger_latency = 5
+start_trigger = 254
+stop_trigger = 255
+
+trigger_helper = {
+    "fixation": 1,
+    "1": 11,
+    "2": 12,
+    "3": 21,
+    "4": 22,
+    "correct_response": 100,
+    "incorrect_response": 200,
+    "no_response": 250,
+    "start_block_1": 51,
+    "start_block_2": 52,
+    "neutral_stimulus": 30
+}
+
+# Global Variables
+
+base_images_loaded = False
+base_images_list = []
+type_orders = ["number", "figure", "color"]
 
 # ==============================
 # Experiment Metadata
@@ -123,7 +151,6 @@ def load_images_from_folder(folder_path):
         print(f"[DEBUG] Loaded {len(images)} images from {folder_path}")
 
     return images
-
 
 # Base image directories
 single_cards_dir = BASE_DIR / "media" / "images" / "Single"
@@ -256,7 +283,6 @@ def init_lpt(address):
     except Exception:
         print('Failed to send initial zero trigger')
 
-
 def send_trigger(trigger, address, latency):
     """Sends a trigger to the parallel port."""
     try:
@@ -266,7 +292,6 @@ def send_trigger(trigger, address, latency):
         print(f'Trigger {trigger} sent')
     except Exception:
         print(f'Failed to send trigger {trigger}')
-
 
 def init_com(address="COM3"):
     """Initializes a serial port connection."""
@@ -280,7 +305,6 @@ def init_com(address="COM3"):
     except Exception:
         print('Serial port could not be opened')
 
-
 def send_triggert(trigger):
     """Sends a trigger via serial port."""
     try:
@@ -289,11 +313,9 @@ def send_triggert(trigger):
     except Exception:
         print(f'Failed to send trigger {trigger}')
 
-
 def sleepy_trigger(trigger, latency=100):
     send_triggert(trigger)
     pygame.time.wait(latency)
-
 
 def close_com():
     """Closes the serial port."""
@@ -302,7 +324,6 @@ def close_com():
         print('Serial port closed')
     except Exception:
         print('Serial port could not be closed')
-
 
 # ==============================
 # Text & Screen Functions
@@ -346,7 +367,6 @@ def setfonts():
     bigchar = pygame.font.Font(font_path, 96)
     char = pygame.font.Font(font_path, 32)
     charnext = pygame.font.Font(font_path, 24)
-
 
 def paragraph(text, key=None, no_foot=False, color=None, limit_time=0,
               row=None, is_clean=True):
@@ -420,7 +440,7 @@ def init():
         screen = pygame.display.set_mode(resolution)
 
     center = (resolution[0] // 2, resolution[1] // 2)
-    background = Color('white')
+    background = Color('lightgray')
     char_color = Color('black')
     charnext_color = Color('black')
 
@@ -430,13 +450,11 @@ def init():
     screen.fill(background)
     pygame.display.flip()
 
-
 def blackscreen(blacktime=0):
     """Clears the screen."""
     screen.fill(background)
     pygame.display.flip()
     pygame.time.delay(blacktime)
-
 
 def ends():
     """Ends the experiment safely."""
@@ -451,11 +469,35 @@ def ends():
             if event.type == KEYUP and event.key == K_ESCAPE:
                 pygame_exit()
 
-
 def pygame_exit():
     pygame.quit()
     sys.exit()
 
+# ==============================
+# Protocol Handler Functions
+# ==============================
+
+def draw_cross(color, center, size, thickness=16):
+    x, y = center
+    half = size // 2
+    pygame.draw.line(screen, color, (x - half, y - half), (x + half, y + half), thickness)
+    pygame.draw.line(screen, color, (x - half, y + half), (x + half, y - half), thickness)
+
+
+def draw_check(color, center, size, thickness=16):
+    x, y = center
+    pygame.draw.line(
+        screen, color,
+        (x - size // 2, y),
+        (x - size // 6, y + size // 2),
+        thickness
+    )
+    pygame.draw.line(
+        screen, color,
+        (x - size // 6, y + size // 2),
+        (x + size // 2, y - size // 2),
+        thickness
+    )
 
 def wait(key, limit_time):
     """Waits for a key press or a timeout."""
@@ -484,6 +526,177 @@ def wait(key, limit_time):
     pygame.event.clear()  # CLEAR EVENTS
 
     return pygame.time.get_ticks() - start_time
+
+def wait_answer(image, series_type):
+    """Waits for a response from the user and returns the answer details."""
+
+    answer_keys = {
+        K_c: 0,
+        K_v: 1,
+        K_b: 2,
+        K_n: 3
+    }
+
+    correct_answer = type_orders.index(series_type)
+    selected_answer = None
+    rt = None
+    waiting = True
+    start_time = pygame.time.get_ticks()
+
+    
+    print(static_images_list)
+    
+    print(series_type)
+    print(correct_answer)
+    print("--------------------")
+
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
+                pygame_exit()
+
+            elif event.type == KEYUP:
+                if event.key in answer_keys:
+                    selected_answer = answer_keys[event.key]
+                    rt = pygame.time.get_ticks() - start_time
+
+                    if static_images_list[answer_keys[event.key]].parts[-1].split('.')[0].split('_')[correct_answer] == image.parts[-1].split(".")[0].split('_')[correct_answer]:
+                        is_correct = True
+                    else:
+                        is_correct = False
+
+                    waiting = False
+
+    return {'selected_answer': selected_answer,
+            'is_correct': is_correct,
+            'rt': rt,}
+
+def show_image_trial(image, scale):
+    global base_images_loaded, base_images_list
+    screen.fill(background)
+    try:
+        picture = pygame.image.load(image)
+        if not base_images_loaded:
+            for actual_image in static_images_list:
+                base_images_list.append(pygame.image.load(actual_image))
+            base_images_loaded = True
+    except pygame.error as e:
+        print(f"Error al cargar imagen {image}: {e}") if debug else None
+        return
+    
+    image_real_size = picture.get_size()
+    percentage = scale / image_real_size[0]
+    picture = pygame.transform.scale(picture, [int(scale), int(image_real_size[1]*percentage)])
+
+    center = [int(resolution[0] / 2), int(resolution[1] / 4)*3]
+
+    # show all 4 base images in the top part of the screen
+    for count, base_image in enumerate(base_images_list):
+        base_image_scaled = pygame.transform.scale(base_image, [int(scale), int(image_real_size[1]*percentage)])
+        base_center = [int(resolution[0] / 8 + count * (resolution[0] / 4)), int(resolution[1] / 8)*2]
+        screen.blit(base_image_scaled, [base_center[0] - base_image_scaled.get_size()[0]/2, base_center[1] - base_image_scaled.get_size()[1]/2])
+
+    screen.blit(picture, [x - picture.get_size()[count]/2 for count, x in enumerate(center)])
+    pygame.display.flip()
+
+def show_images(image_list, practice=False, uid=None, dfile=None, block=None, series_types=None):
+
+    phase_change = USEREVENT + 2
+    pygame.time.set_timer(phase_change, 500, loops=1)
+
+    done = False
+    image_count = -1
+    serie_count = 0
+
+    starting_block = True
+
+    screen.fill(background)
+    pygame.display.flip()
+
+    answers_list = []
+
+    actual_phase = 1
+
+    while not done:
+        for event in pygame.event.get():
+            if event.type == KEYUP and event.key == K_ESCAPE and debug:
+                pygame_exit()
+
+            elif event.type == KEYUP and event.key == K_p and debug:
+                done = True
+
+            elif event.type == phase_change:
+                if actual_phase == 1: # Fixation Phase
+                    screen.fill(background)
+                    screen.blit(fix, fixbox)
+                    pygame.display.update(fixbox)
+                    pygame.display.flip()
+                    sleepy_trigger(1, trigger_latency)
+                    if starting_block:
+                        pygame.time.set_timer(phase_change, 600, loops=1)
+                        starting_block = False
+                    else:
+                        pygame.time.set_timer(phase_change, randint(1500, 2000), loops=1)
+                    actual_phase = 2
+                elif actual_phase == 2: # Target Card Presentation Phase
+                    image_count += 1
+                    if image_list[serie_count]["serie_size"] <= image_count:
+                        image_count = 0
+                        serie_count += 1
+                        if serie_count >= len(image_list):
+                            done = True
+                            break
+                    
+                    show_image_trial(image_list[serie_count]["order"][image_count], 300)
+                    sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
+
+                    pygame.time.set_timer(phase_change, 600, loops=1)
+                    actual_phase = 3
+                    print(serie_count, image_count)
+                elif actual_phase == 3: # Wait for answer phase
+                    answer = wait_answer(image_list[serie_count]["order"][image_count], series_types[serie_count])
+                    answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
+
+                    # Lanzamiento de trigger según la respuesta
+                    if answer['is_correct']:
+                        sleepy_trigger(trigger_helper["correct_response"], trigger_latency)
+                    else:
+                        sleepy_trigger(trigger_helper["incorrect_response"], trigger_latency)
+                    
+                    screen.fill(background)
+                    
+                    if answer['is_correct']:
+                        draw_check((0, 200, 0), center, 120)
+                    else:
+                        draw_cross((200, 0, 0), center, 120)
+
+
+                    pygame.display.flip()
+                    pygame.time.set_timer(phase_change, randint(1000, 1200), loops=1)
+                    actual_phase = 1
+
+    pygame.time.set_timer(phase_change, 0)
+
+    pygame.event.clear()                    # CLEAR EVENTS
+
+    # acá se almacenará la answers_list en el archivo dfile
+    if dfile is not None:
+        for answer in answers_list:
+            # Unir la lista con guiones en lugar de comas
+            dfile.write("%s,%s,%s,%s,%s,%s,%s,%s,%s\n" % (uid,
+                                                    (Path(answer[0][0]).relative_to(script_path)).parts[-1].split('.')[0],
+                                                    block,
+                                                    answer[1]['rt'],
+                                                    (Path(answer[0][0]).relative_to(script_path)).parts[2],
+                                                    answer[0][1],
+                                                    "Cara" if block == 1 else "Palabra",
+                                                    answer[1]['selected_answer'],
+                                                    int(answer[1]['is_correct']) if answer[1]['is_correct'] is not None else ""
+                                                 ))
+            #("Sujeto", "IdImagen", "Bloque", "TReaccion", "TipoImagen", "Palabra", "TipoRespuesta", "Respuesta", "Acierto"))
+        dfile.flush()
+    else:
+        print("Error al cargar el archivo de datos")
 
 # ==============================
 # Block / Series Generation
@@ -692,6 +905,36 @@ def block_creation():
         create_debug_zip(temp_path, zip_name)
 
         return list_of_all_blocks_series_stacks
+    
+def generate_series_types_for_block():
+    """
+    Generate the ordered list of series types for a block.
+
+    Rules:
+    - There are 3 types: "number", "color", "figure".
+    - Each block has 15 series total (5 iterations of the 3 types).
+    - Each iteration shuffles the 3 types.
+    - The first element of a new iteration cannot be equal to
+      the last element already added to the global list.
+
+    Returns:
+        list[str]: A list of 15 elements with balanced and ordered types.
+    """
+    base_types = ["number", "color", "figure"]
+    final_types = []
+
+    for _ in range(5):
+        current_types = base_types.copy()
+        shuffle(current_types)
+
+        # Ensure no boundary repetition with previous block
+        if final_types:
+            while current_types[0] == final_types[-1]:
+                shuffle(current_types)
+
+        final_types.extend(current_types)
+
+    return final_types
 
 # ==============================
 # Debug Validation
@@ -717,6 +960,8 @@ def create_debug_zip(debug_base_dir, zip_name, debug=True):
 
 def main():
 
+    init()
+
     # if not media folders exist, exit
     if not single_cards_dir.exists() or not double_cards_dir.exists():
         print("Media folders not found. Please ensure the 'media/images/Single' and 'media/images/Double' directories exist.")
@@ -724,6 +969,14 @@ def main():
 
     # Block series stacks generation and debug files
     block_stacks = block_creation()
+    
+    send_triggert(start_trigger)
+
+    for block_number, block in enumerate(block_stacks):
+        series_types = generate_series_types_for_block()
+        show_images(block, practice=False, uid="TestSubject", dfile=None, block=block_number + 1, series_types=series_types)
+
+    
 
 if __name__ == "__main__":
     main()
