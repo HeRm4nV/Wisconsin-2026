@@ -649,27 +649,12 @@ init_com(address="COM4")  # Usar puerto correcto
 
 Para preguntas, reportar bugs o solicitar nuevas funcionalidades:
 
-- **Email**: [tu_email@institucion.edu]
-- **Issues**: [URL del repositorio]/issues
-- **Documentación**: [URL de la wiki]
-
----
-
-## Licencia
-
-[Especificar licencia: MIT, GPL, etc.]
-
----
-
-## Agradecimientos
-
-- [Nombres de colaboradores]
-- [Instituciones participantes]
-- [Fuentes de financiamiento]
+- **Email**: herman.valencia.inf@gmail.com
+- **Issues**: https://github.com/HeRm4nV/Wisconsin-2026/issues
 
 ---
 
 **Última actualización**: 30 de enero de 2026  
 **Versión del documento**: 2.0  
-**Versión del código**: 0.1  
+**Versión del código**: 0.2
 **Estado**: ✅ Funcional | 🚧 Triggers en desarrollo
