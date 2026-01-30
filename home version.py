@@ -363,8 +363,8 @@ def select_slide(slide_name, variables=None):
             "",
             u"Responde lo más rápido posible."
         ],
-        'Break': [
-            u"Fin del bloque " + str(variables["blockNumber"]) + ".",
+        'break': [
+            u"Fin del bloque " + str(variables["blockNumber"] + 1) + ".",
             " ",
             u"Tómate de 2 a 3 minutos para descansar.",
             " ",
@@ -671,9 +671,8 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
                     
                     show_image_trial(image_list[serie_count]["order"][image_count], 300)
                     sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
-                    actual_phase = 3
                     print(serie_count, image_count)
-                elif actual_phase == 3: # Wait for answer phase
+
                     answer = wait_answer(image_list[serie_count]["order"][image_count], series_types[serie_count])
                     answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
 
@@ -693,7 +692,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
                     pygame.display.flip()
                     pygame.time.set_timer(phase_change, 1500, loops=1)
                     actual_phase = 1
-
+                    
     pygame.time.set_timer(phase_change, 0)
 
     pygame.event.clear()                    # CLEAR EVENTS
@@ -1001,7 +1000,7 @@ def main():
         if block_number < len(block_stacks) - 1:
             paragraph(select_slide('break', variables={"blockNumber": block_number, "practice": False}), key = K_SPACE, no_foot = False)
 
-    paragraph(select_slide('farewell'), key = None, no_foot = True)
+    paragraph(select_slide('farewell'), key = K_SPACE, no_foot = True)
     close_com()
     ends()
 
