@@ -335,13 +335,33 @@ def select_slide(slide_name, variables=None):
     """
 
     if variables is None:
-        variables = {"blockNumber": 0, "practice": True}
+        variables = {"blockNumber": 0, "practice": False}
 
     basic_slides = {
         'welcome': [
             u"Bienvenido/a, a este experimento!!!",
             " ",
             u"Se te indicará paso a paso que hacer."
+        ],
+        'instructions': [
+            u"¡Bienvenida/o! Este experimento consta de cuatro bloques con",
+            u"descansos de 2 a 3 minutos entre ellos. Durante las pausas aparecerá el",
+            u"mensaje “Fin del bloque X”, y deberás esperar la indicación para continuar.",
+            "",
+            u"En cada ensayo, deberás emparejar la carta central con una de las",
+            u"cuatro cartas de referencia ubicadas en la parte superior. La selección",
+            u"se basa en una regla que puede ser color, forma o número, la cual no",
+            u"se indicará y puede cambiar sin previo aviso.",
+            "",
+            u"Tras cada respuesta, recibirás retroalimentación de “Correcto” o",
+            u"“Incorrecto”, que deberás usar para inferir la regla vigente.",
+            "",
+            u"Para responder, presiona la tecla correspondiente según la posición",
+            u"de la carta de referencia de izquierda a derecha:",
+            u"C (triángulo rojo), V (dos estrellas verdes),",
+            u"B (tres cruces amarillas) y N (cuatro círculos azules).",
+            "",
+            u"Responde lo más rápido posible."
         ],
         'Break': [
             u"Fin del bloque " + str(variables["blockNumber"]) + ".",
@@ -599,10 +619,9 @@ def show_image_trial(image, scale):
     screen.blit(picture, [x - picture.get_size()[count]/2 for count, x in enumerate(center)])
     pygame.display.flip()
 
-def show_images(image_list, practice=False, uid=None, dfile=None, block=None, series_types=None):
+def show_images(image_list, uid=None, dfile=None, block=None, series_types=None):
 
     phase_change = USEREVENT + 2
-    pygame.time.set_timer(phase_change, 500, loops=1)
 
     done = False
     image_count = -1
@@ -611,11 +630,14 @@ def show_images(image_list, practice=False, uid=None, dfile=None, block=None, se
     starting_block = True
 
     screen.fill(background)
+    screen.blit(fix, fixbox)
+    pygame.display.update(fixbox)
     pygame.display.flip()
+    pygame.time.set_timer(phase_change, 600, loops=1)
 
     answers_list = []
 
-    actual_phase = 1
+    actual_phase = 2
 
     while not done:
         for event in pygame.event.get():
@@ -649,8 +671,6 @@ def show_images(image_list, practice=False, uid=None, dfile=None, block=None, se
                     
                     show_image_trial(image_list[serie_count]["order"][image_count], 300)
                     sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
-
-                    pygame.time.set_timer(phase_change, 600, loops=1)
                     actual_phase = 3
                     print(serie_count, image_count)
                 elif actual_phase == 3: # Wait for answer phase
@@ -670,9 +690,8 @@ def show_images(image_list, practice=False, uid=None, dfile=None, block=None, se
                     else:
                         draw_cross((200, 0, 0), center, 120)
 
-
                     pygame.display.flip()
-                    pygame.time.set_timer(phase_change, randint(1000, 1200), loops=1)
+                    pygame.time.set_timer(phase_change, 1500, loops=1)
                     actual_phase = 1
 
     pygame.time.set_timer(phase_change, 0)
@@ -972,11 +991,20 @@ def main():
     
     send_triggert(start_trigger)
 
+    paragraph(select_slide('instructions'), key = K_SPACE, no_foot = False)
+
     for block_number, block in enumerate(block_stacks):
         series_types = generate_series_types_for_block()
-        show_images(block, practice=False, uid="TestSubject", dfile=None, block=block_number + 1, series_types=series_types)
+        show_images(block, uid="TestSubject", dfile=None, block=block_number + 1, series_types=series_types)
 
-    
+        # if not the last block, show break screen
+        if block_number < len(block_stacks) - 1:
+            paragraph(select_slide('break', variables={"blockNumber": block_number, "practice": False}), key = K_SPACE, no_foot = False)
+
+    paragraph(select_slide('farewell'), key = None, no_foot = True)
+    close_com()
+    ends()
+
 
 if __name__ == "__main__":
     main()
