@@ -64,17 +64,49 @@ start_trigger = 254
 stop_trigger = 255
 
 trigger_helper = {
-    "fixation": 1,
-    "1": 11,
-    "2": 12,
-    "3": 21,
-    "4": 22,
-    "correct_response": 100,
-    "incorrect_response": 200,
-    "no_response": 250,
-    "start_block_1": 51,
-    "start_block_2": 52,
-    "neutral_stimulus": 30
+    "fixation": 70,
+    "block_1_start": 1,
+    "block_2_start": 2,
+    "block_3_start": 3,
+    "block_4_start": 4,
+    "block_1_end": 10,
+    "block_2_end": 20,
+    "block_3_end": 30,
+    "block_4_end": 40,
+    "first_stimulus_per_serie": 60,
+    "answer_1": 21,
+    "answer_2": 22,
+    "answer_3": 23,
+    "answer_4": 24,
+    "actual_rule_number": 11,
+    "actual_rule_figure": 12,
+    "actual_rule_color": 13,
+    "blue_card": 31,
+    "red_card": 32,
+    "green_card": 33,
+    "yellow_card": 34,
+    "star_card": 41,
+    "triangle_card": 42,
+    "cross_card": 43,
+    "circle_card": 44,
+    "number_1_card": 51,
+    "number_2_card": 52,
+    "number_3_card": 53,
+    "number_4_card": 54,
+    "correct_response": 121,
+    "incorrect_response": 102,
+    "first_error": 104,
+    "second_error": 106,
+    "other_error": 108,
+    "error_between_correct": 110,
+    "first_correct": 141,
+    "second_correct": 161,
+    "other_correct": 181,
+
+    
+
+    "start_experiment": 254,
+    "end_experiment": 255,
 }
 
 # Global Variables
@@ -305,7 +337,7 @@ def init_com(address="COM3"):
     except Exception:
         print('Serial port could not be opened')
 
-def send_triggert(trigger):
+def send_trigger(trigger):
     """Sends a trigger via serial port."""
     try:
         ser.write((trigger).to_bytes(1, 'little'))
@@ -314,7 +346,7 @@ def send_triggert(trigger):
         print(f'Failed to send trigger {trigger}')
 
 def sleepy_trigger(trigger, latency=100):
-    send_triggert(trigger)
+    send_trigger(trigger)
     pygame.time.wait(latency)
 
 def close_com():
@@ -653,7 +685,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
                     screen.blit(fix, fixbox)
                     pygame.display.update(fixbox)
                     pygame.display.flip()
-                    sleepy_trigger(1, trigger_latency)
+                    #sleepy_trigger(1, trigger_latency)
                     if starting_block:
                         pygame.time.set_timer(phase_change, 600, loops=1)
                         starting_block = False
@@ -670,12 +702,16 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
                             break
                     
                     show_image_trial(image_list[serie_count]["order"][image_count], 300)
-                    sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
+                    #sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
                     print(serie_count, image_count)
 
                     answer = wait_answer(image_list[serie_count]["order"][image_count], series_types[serie_count])
                     answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
-
+                    screen.fill(background)
+                    pygame.display.flip()
+                    pygame.time.set_timer(phase_change, 200, loops=1)
+                    actual_phase = 3
+                elif actual_phase == 3: # Response Feedback Phase
                     # Lanzamiento de trigger según la respuesta
                     if answer['is_correct']:
                         sleepy_trigger(trigger_helper["correct_response"], trigger_latency)
@@ -711,7 +747,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
                                                     answer[1]['selected_answer'],
                                                     int(answer[1]['is_correct']) if answer[1]['is_correct'] is not None else ""
                                                  ))
-            #("Sujeto", "IdImagen", "Bloque", "TReaccion", "TipoImagen", "Palabra", "TipoRespuesta", "Respuesta", "Acierto"))
+            
         dfile.flush()
     else:
         print("Error al cargar el archivo de datos")
@@ -988,7 +1024,7 @@ def main():
     # Block series stacks generation and debug files
     block_stacks = block_creation()
     
-    send_triggert(start_trigger)
+    send_trigger(start_trigger)
 
     paragraph(select_slide('instructions'), key = K_SPACE, no_foot = False)
 
