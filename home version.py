@@ -718,8 +718,6 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
                 elif actual_phase == 2: # Target Card Presentation Phase
                     image_count += 1
                     if image_list[serie_count]["serie_size"] <= image_count:
-                        send_trigger(trigger_helper["first_stimulus_per_serie"], lpt_address, trigger_latency)
-                        send_trigger(trigger_helper[f"actual_rule_{series_types[serie_count]}"], lpt_address, trigger_latency)
                         image_count = 0
                         serie_count += 1
                         corrects_in_series = 0
@@ -727,6 +725,8 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
                         if serie_count >= len(image_list):
                             done = True
                             break
+                        first_stimulus_trigger_sent = False
+                        
                     elif image_list[serie_count]["serie_size"] - 1 == image_count:
                         last_image = True
                     
