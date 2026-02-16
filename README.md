@@ -7,9 +7,10 @@ Este experimento implementa una versión adaptada del **Wisconsin Card Sorting T
 ## Información del Experimento
 
 - **Nombre**: Wisconsin Task
-- **Versión**: 0.2
+- **Versión**: 1.0
 - **Python Version**: 3.11
 - **Autor**: Herman Valencia
+- **Estado**: ✅ Funcional | ✅ Sistema de Triggers Completo
 
 ---
 
@@ -65,10 +66,10 @@ El experimento utiliza **4 cartas de referencia estáticas** ubicadas en la part
 
 | Posición | Tecla | Descripción | Archivo |
 |----------|-------|-------------|---------|
-| 1 (Izquierda) | **C** | Triángulo rojo | `Static/` |
-| 2 | **V** | Dos estrellas verdes | `Static/` |
-| 3 | **B** | Tres cruces amarillas | `Static/` |
-| 4 (Derecha) | **N** | Cuatro círculos azules | `Static/` |
+| 1 (Izquierda) | **C** | Triángulo rojo | `1_triangle_red.png` |
+| 2 | **V** | Dos estrellas verdes | `2_star_green.png` |
+| 3 | **B** | Tres cruces amarillas | `3_cross_yellow.png` |
+| 4 (Derecha) | **N** | Cuatro círculos azules | `4_circle_blue.png` |
 
 ---
 
@@ -98,7 +99,12 @@ Las imágenes deben seguir el formato:
 [número]_[figura]_[color].png
 ```
 
-**Ejemplo**: `1_triangle_red.png`
+**Ejemplo**: `1_triangle_red.png`, `2_star_green.png`, `3_cross_yellow.png`
+
+**Valores válidos**:
+- **Número**: `1`, `2`, `3`, `4`
+- **Figura**: `triangle`, `star`, `cross`, `circle`
+- **Color**: `red`, `green`, `yellow`, `blue`
 
 ---
 
@@ -168,15 +174,40 @@ Responde lo más rápido posible.
 
 1. **Fijación** (600 ms inicialmente, luego 1500-2000 ms aleatorio)
    - Se presenta una cruz de fijación (`+`) en el centro de la pantalla
+   - **Trigger enviado**: `70` (fixation)
 
 2. **Presentación del Estímulo**
    - Se muestra la carta objetivo en el centro inferior
    - Las 4 cartas de referencia permanecen visibles arriba
    - El participante responde usando las teclas **C**, **V**, **B**, o **N**
+   - **Triggers enviados**:
+     - Color de la carta: `31`-`34`
+     - Figura de la carta: `41`-`44`
+     - Número de elementos: `51`-`54`
+     - Primer estímulo de la serie: `60` (solo en el primer ensayo)
+     - Regla activa: `11` (number), `12` (figure), o `13` (color)
+     - Última carta de la serie: `235` (solo en el último ensayo)
 
-3. **Retroalimentación** (1500 ms)
+3. **Registro de Respuesta**
+   - **Trigger enviado**: `21`-`24` según tecla presionada (C=21, V=22, B=23, N=24)
+
+4. **Retroalimentación** (1500 ms)
    - **Correcto**: ✓ verde en el centro de la pantalla
    - **Incorrecto**: ✗ roja en el centro de la pantalla
+   - **Triggers enviados**:
+     - Respuesta correcta: `121`
+     - Respuesta incorrecta: `102`
+     - Posición en secuencia de aciertos/errores:
+       - Primera correcta: `141`
+       - Segunda correcta: `161`
+       - Otra correcta: `181`
+       - Primer error: `104`
+       - Segundo error: `106`
+       - Otro error: `108`
+       - Error entre correctas: `110`
+     - Feedback de última carta (solo en último ensayo de serie):
+       - `205`, `210`, `215` (errores)
+       - `220`, `225`, `230` (aciertos)
 
 ### Descansos Entre Bloques
 
@@ -188,6 +219,8 @@ Tómate de 2 a 3 minutos para descansar.
 Cuando estés lista/o para continuar presiona la barra espaciadora.
 ```
 
+- **Trigger al final de cada bloque**: `10`, `20`, `30`, `40` (según bloque)
+
 ### Finalización
 
 ```
@@ -195,6 +228,8 @@ La tarea ha finalizado.
 
 Muchas gracias por su colaboración!!
 ```
+
+- **Trigger de fin de experimento**: `255`
 
 ---
 
@@ -215,41 +250,219 @@ Muchas gracias por su colaboración!!
 
 ## Sistema de Triggers EEG
 
-> ⚠️ **NOTA**: El sistema de triggers está en proceso de actualización y ampliación en la última versión del código.
+### Configuración del Sistema
 
-### Triggers Implementados
+El sistema de triggers está completamente implementado y soporta tanto puerto paralelo (LPT) como puerto serial (COM).
 
-| Evento | Código | Descripción |
+**Configuración en el código**:
+```python
+lpt_address = 0xD100       # Dirección del puerto paralelo
+trigger_latency = 5        # Latencia en milisegundos
+start_trigger = 254        # Trigger de inicio
+stop_trigger = 255         # Trigger de fin
+```
+
+### Tabla Completa de Triggers
+
+#### Triggers de Control del Experimento
+
+| Código | Nombre | Descripción | Momento de Envío |
+|--------|--------|-------------|------------------|
+| `254` | `start_experiment` | Inicio del experimento | Al comenzar la sesión |
+| `255` | `end_experiment` | Fin del experimento | Al finalizar la sesión |
+| `70` | `fixation` | Cruz de fijación | Antes de cada ensayo |
+
+#### Triggers de Bloques
+
+| Código | Nombre | Descripción |
 |--------|--------|-------------|
-| Inicio del experimento | `254` | Marca el comienzo de la sesión |
-| Fin del experimento | `255` | Marca el final de la sesión |
+| `1` | `block_1_start` | Inicio del bloque 1 |
+| `2` | `block_2_start` | Inicio del bloque 2 |
+| `3` | `block_3_start` | Inicio del bloque 3 |
+| `4` | `block_4_start` | Inicio del bloque 4 |
+| `10` | `block_1_end` | Fin del bloque 1 |
+| `20` | `block_2_end` | Fin del bloque 2 |
+| `30` | `block_3_end` | Fin del bloque 3 |
+| `40` | `block_4_end` | Fin del bloque 4 |
+
+#### Triggers de Series
+
+| Código | Nombre | Descripción |
+|--------|--------|-------------|
+| `60` | `first_stimulus_per_serie` | Primer estímulo de cada serie |
+| `235` | `last_target_card` | Última carta objetivo de la serie |
+
+#### Triggers de Reglas Activas
+
+| Código | Nombre | Descripción |
+|--------|--------|-------------|
+| `11` | `actual_rule_number` | Regla activa: Número |
+| `12` | `actual_rule_figure` | Regla activa: Figura |
+| `13` | `actual_rule_color` | Regla activa: Color |
+
+#### Triggers de Atributos de Cartas - Color
+
+| Código | Nombre | Descripción |
+|--------|--------|-------------|
+| `31` | `blue_card` | Carta con elementos azules |
+| `32` | `red_card` | Carta con elementos rojos |
+| `33` | `green_card` | Carta con elementos verdes |
+| `34` | `yellow_card` | Carta con elementos amarillos |
+
+#### Triggers de Atributos de Cartas - Figura
+
+| Código | Nombre | Descripción |
+|--------|--------|-------------|
+| `41` | `star_card` | Carta con estrellas |
+| `42` | `triangle_card` | Carta con triángulos |
+| `43` | `cross_card` | Carta con cruces |
+| `44` | `circle_card` | Carta con círculos |
+
+#### Triggers de Atributos de Cartas - Número
+
+| Código | Nombre | Descripción |
+|--------|--------|-------------|
+| `51` | `number_1_card` | Carta con 1 elemento |
+| `52` | `number_2_card` | Carta con 2 elementos |
+| `53` | `number_3_card` | Carta con 3 elementos |
+| `54` | `number_4_card` | Carta con 4 elementos |
+
+#### Triggers de Respuestas del Participante
+
+| Código | Nombre | Descripción |
+|--------|--------|-------------|
+| `21` | `answer_1` | Respuesta: Tecla C (carta 1) |
+| `22` | `answer_2` | Respuesta: Tecla V (carta 2) |
+| `23` | `answer_3` | Respuesta: Tecla B (carta 3) |
+| `24` | `answer_4` | Respuesta: Tecla N (carta 4) |
+
+#### Triggers de Evaluación de Respuestas
+
+| Código | Nombre | Descripción |
+|--------|--------|-------------|
+| `121` | `correct_response` | Respuesta correcta |
+| `102` | `incorrect_response` | Respuesta incorrecta |
+
+#### Triggers de Secuencias de Aciertos
+
+| Código | Nombre | Descripción |
+|--------|--------|-------------|
+| `141` | `first_correct` | Primera respuesta correcta consecutiva |
+| `161` | `second_correct` | Segunda respuesta correcta consecutiva |
+| `181` | `other_correct` | Tercera o más respuestas correctas consecutivas |
+
+#### Triggers de Secuencias de Errores
+
+| Código | Nombre | Descripción |
+|--------|--------|-------------|
+| `104` | `first_error` | Primer error consecutivo |
+| `106` | `second_error` | Segundo error consecutivo |
+| `108` | `other_error` | Tercer o más errores consecutivos |
+| `110` | `error_between_correct` | Error después de respuestas correctas |
+
+#### Triggers de Feedback Final de Serie
+
+| Código | Nombre | Descripción |
+|--------|--------|-------------|
+| `205` | `last_feedback_104` | Feedback del último ensayo (primer error) |
+| `210` | `last_feedback_106` | Feedback del último ensayo (segundo error) |
+| `215` | `last_feedback_108` | Feedback del último ensayo (otros errores) |
+| `220` | `last_feedback_141` | Feedback del último ensayo (primera correcta) |
+| `225` | `last_feedback_161` | Feedback del último ensayo (segunda correcta) |
+| `230` | `last_feedback_181` | Feedback del último ensayo (otras correctas) |
+
+### Secuencia Típica de Triggers por Ensayo
+
+**Ejemplo: Primer ensayo de una serie nueva (regla = color, carta = 2 estrellas verdes)**
+
+```
+1. [70]  → fixation (cruz de fijación)
+2. [60]  → first_stimulus_per_serie (primer estímulo)
+3. [13]  → actual_rule_color (regla activa: color)
+4. [33]  → green_card (carta verde)
+5. [41]  → star_card (carta con estrellas)
+6. [52]  → number_2_card (carta con 2 elementos)
+7. [22]  → answer_2 (usuario presiona V)
+8. [121] → correct_response (respuesta correcta)
+9. [141] → first_correct (primera correcta de la serie)
+```
+
+**Ejemplo: Último ensayo de una serie (respuesta correcta)**
+
+```
+1. [70]  → fixation
+2. [235] → last_target_card (última carta de la serie)
+3. [32]  → red_card
+4. [42]  → triangle_card
+5. [51]  → number_1_card
+6. [21]  → answer_1
+7. [121] → correct_response
+8. [181] → other_correct (tercera o más correcta)
+9. [230] → last_feedback_181 (feedback final de serie)
+```
 
 ### Integración Hardware
 
 #### Puerto Paralelo (LPT)
+
 ```python
 init_lpt(address=0xD100)
 send_trigger(trigger, address, latency=5)
 ```
-- **Requisito**: `dlportio.dll` (solo Windows)
-- **Permisos**: Requiere privilegios de administrador
-- **Uso**: Para sistemas EEG tradicionales
+
+**Requisitos**:
+- Sistema operativo Windows
+- Archivo [`dlportio.dll`](https://real.kiev.ua/avreal/download/) instalado
+- Permisos de administrador
+
+**Instalación de dlportio.dll**:
+1. Descargar desde el enlace oficial
+2. Copiar a:
+   - `C:\Windows\System32\` (Windows 64-bit)
+   - `C:\Windows\SysWOW64\` (Windows 32-bit)
+3. Ejecutar el programa como Administrador
 
 #### Puerto Serial (COM)
+
 ```python
 init_com(address="COM3")
-send_triggert(trigger)
+send_trigger(trigger)
 close_com()
 ```
+
+**Configuración**:
 - **Baudrate**: 115200
 - **Formato**: 1 byte por trigger
-- **Uso**: Para sistemas EEG modernos con interfaz serial
+- **Puerto por defecto**: COM3
 
-### Latencia de Triggers
+**Verificar puertos disponibles**:
+```python
+import serial.tools.list_ports
+ports = serial.tools.list_ports.comports()
+for port in ports:
+    print(port.device)
+```
 
-- **Latencia configurada**: 5 ms
-- **Función**: `sleepy_trigger(trigger, latency=100)`
-- El sistema espera la latencia especificada antes de resetear el puerto
+### Función de Trigger con Latencia
+
+```python
+sleepy_trigger(trigger, latency=100)
+```
+
+Esta función envía un trigger y espera la latencia especificada antes de continuar, útil para asegurar la recepción del trigger por el sistema EEG.
+
+### Validación de Triggers
+
+Para verificar que los triggers se envían correctamente:
+
+1. **Activar modo debug**: `debug = True` en [`home version.py`](home%20version.py)
+2. Los mensajes de consola mostrarán cada trigger enviado:
+   ```
+   Trigger 70 sent
+   Trigger 60 sent
+   Trigger 13 sent
+   ...
+   ```
 
 ---
 
@@ -309,21 +522,27 @@ Distribución de mazos:
     ...
 ```
 
-#### 2. Archivo de Datos Experimentales (Planificado)
+#### 2. Archivo de Datos Experimentales (En Desarrollo)
 
-**Formato CSV** con las siguientes columnas:
+**Formato CSV planeado** con las siguientes columnas:
 
 | Campo | Descripción |
 |-------|-------------|
 | `Sujeto` | ID del participante |
 | `IdImagen` | Nombre del archivo de la carta |
 | `Bloque` | Número de bloque (1-4) |
-| `Serie` | Número de serie dentro del bloque |
+| `Serie` | Número de serie dentro del bloque (1-15) |
+| `Ensayo` | Número de ensayo dentro de la serie |
 | `TipoRegla` | Regla activa (number/color/figure) |
 | `TReaccion` | Tiempo de reacción en ms |
 | `TipoImagen` | Single o Double |
+| `ColorCarta` | Color de la carta (red/green/yellow/blue) |
+| `FiguraCarta` | Figura de la carta (triangle/star/cross/circle) |
+| `NumeroCarta` | Número de elementos (1/2/3/4) |
 | `Respuesta` | Tecla presionada (0=C, 1=V, 2=B, 3=N) |
 | `Acierto` | 1 si correcto, 0 si incorrecto |
+| `SecuenciaAciertos` | Contador de aciertos consecutivos |
+| `SecuenciaErrores` | Contador de errores consecutivos |
 
 ### Metadata de Sesión
 
@@ -359,19 +578,17 @@ pyserial 3.5
 **Singles** (24 archivos requeridos):
 ```
 media/images/Single/
-├── [imagen1].png
-├── [imagen2].png
-...
-└── [imagen24].png
+├── [numero]_[figura]_[color].png
+├── ...
+└── [numero]_[figura]_[color].png
 ```
 
 **Doubles** (36 archivos requeridos):
 ```
 media/images/Double/
-├── [imagen1].png
-├── [imagen2].png
-...
-└── [imagen36].png
+├── [numero]_[figura]_[color].png
+├── ...
+└── [numero]_[figura]_[color].png
 ```
 
 **Static** (4 archivos requeridos):
@@ -400,7 +617,7 @@ cd Wisconsin
 pip install -r requirements.txt
 ```
 
-**Contenido de `requirements.txt`**:
+**Contenido de [`requirements.txt`](requirements.txt)**:
 ```txt
 pygame==2.5.2
 pyserial==3.5
@@ -420,7 +637,18 @@ ls media/images/Static/
 # Static: 4 archivos
 ```
 
-### 4. Ejecutar el Experimento
+### 4. Configurar Hardware EEG (Opcional)
+
+**Para Puerto Paralelo**:
+1. Instalar `dlportio.dll`
+2. Verificar dirección del puerto: `lpt_address = 0xD100`
+3. Ejecutar como Administrador
+
+**Para Puerto Serial**:
+1. Identificar puerto COM disponible
+2. Modificar en código si es necesario: `init_com(address="COM3")`
+
+### 5. Ejecutar el Experimento
 
 ```bash
 python "home version.py"
@@ -444,6 +672,7 @@ debug = True
    - Información de carga de imágenes
    - Progreso de generación de bloques
    - Detalles de cada ensayo
+   - **Todos los triggers enviados**
 
 2. **Archivos de Validación**
    - Generación automática de ZIP en `debug_data/`
@@ -452,14 +681,20 @@ debug = True
 
 3. **Controles Adicionales**
    - `P`: Saltar bloque actual
-   - `ESC`: Salir en cualquier momento
+   - `ESC`: Salir en cualquier momento (modo debug)
 
 4. **Información de Respuestas**
    ```python
    print(serie_count, image_count)  # Posición actual
    print(series_type)                # Regla activa
    print(correct_answer)             # Respuesta correcta
+   print(static_images_list)         # Cartas de referencia
    ```
+
+5. **Triggers Visibles**
+   - Cada trigger enviado se imprime en consola
+   - Formato: `Trigger [código] sent`
+   - Útil para depuración de sincronización EEG
 
 ---
 
@@ -483,6 +718,10 @@ debug = True
    - Cada serie comienza con 2 singles
    - Error si no hay suficientes singles disponibles
 
+5. **Reglas Balanceadas**
+   - 5 repeticiones de cada regla por bloque
+   - No repetición entre fin e inicio de iteraciones
+
 ### Verificación Manual
 
 Usar los archivos de debug para verificar:
@@ -493,6 +732,15 @@ cd debug_data
 unzip debug_blocks_[fecha].zip -d temp/
 cat temp/debug_blocks_structure.txt
 ```
+
+### Validación de Triggers
+
+Para validar que los triggers se envíen correctamente:
+
+1. Ejecutar en modo debug
+2. Revisar la consola para cada trigger enviado
+3. Usar un sistema de prueba EEG para verificar recepción
+4. Comparar timestamps con eventos esperados
 
 ---
 
@@ -536,7 +784,7 @@ deck_sizes_per_block = [
 **Causa**: Falta `dlportio.dll` o permisos insuficientes
 
 **Solución**:
-1. Descargar `dlportio.dll` de: [enlace oficial]
+1. Descargar `dlportio.dll` de: https://real.kiev.ua/avreal/download/
 2. Copiar a `C:\Windows\System32\` (64-bit) o `C:\Windows\SysWOW64\` (32-bit)
 3. Ejecutar como Administrador
 
@@ -555,6 +803,25 @@ for port in ports:
 # Cambiar puerto en el código
 init_com(address="COM4")  # Usar puerto correcto
 ```
+
+### Triggers No Se Envían
+
+**Causa**: Puerto no inicializado o configuración incorrecta
+
+**Solución**:
+1. Verificar que `init_lpt()` o `init_com()` se llamen al inicio
+2. Comprobar mensajes de consola: "Parallel/Serial port opened"
+3. Verificar latencia: `trigger_latency = 5`
+4. Probar con diferentes direcciones de puerto
+
+### Triggers Duplicados o Perdidos
+
+**Causa**: Latencia insuficiente o problemas de sincronización
+
+**Solución**:
+1. Aumentar `trigger_latency` a 10-20 ms
+2. Usar `sleepy_trigger()` en lugar de `send_trigger()` directo
+3. Verificar que el sistema EEG pueda procesar triggers rápidos
 
 ---
 
@@ -585,48 +852,69 @@ init_com(address="COM4")  # Usar puerto correcto
 - **No se sobreescriben**: cada sesión tiene su propio timestamp
 - Útiles para validar la estructura del experimento antes de recopilar datos
 
+### 6. Sistema de Triggers
+- Los triggers se envían de forma **síncrona** con los eventos visuales
+- La latencia de 5ms asegura recepción confiable
+- Todos los triggers importantes se documentan en la consola (modo debug)
+- El sistema soporta tanto puerto paralelo como serial
+
+### 7. Nomenclatura de Archivos
+- **Crítico**: Los nombres de archivos deben seguir el formato exacto
+- Formato: `[numero]_[figura]_[color].png`
+- El sistema extrae atributos directamente del nombre del archivo
+- Nombres incorrectos causarán errores de validación
+
 ---
 
-## Cambios Recientes (Última Versión)
+## Cambios en Versión 1.0
 
-### ✅ Implementado
+### ✅ Nuevo en esta Versión
 
-1. **Sistema DeckCursor mejorado**
-   - Gestión proporcional de singles y doubles
-   - Reutilización eficiente entre mazos
+1. **Sistema de Triggers Completo**
+   - 50+ triggers implementados para eventos específicos
+   - Soporte completo para puerto paralelo y serial
+   - Tracking de secuencias de aciertos y errores
+   - Triggers específicos para atributos de cartas (color, figura, número)
+   - Feedback diferenciado para última carta de serie
 
-2. **Generación de reglas de clasificación**
-   - Función `generate_series_types_for_block()`
+2. **Validación de Respuestas Mejorada**
+   - Comparación dinámica según regla activa
+   - Extracción automática de atributos desde nombres de archivo
+   - Registro de tiempo de reacción
+   - Detección de patrones de error
+
+3. **Retroalimentación Visual Mejorada**
+   - ✓ verde para respuestas correctas
+   - ✗ roja para respuestas incorrectas
+   - Funciones [`draw_check()`](home%20version.py) y [`draw_cross()`](home%20version.py)
+
+4. **Generación de Reglas Balanceadas**
+   - Función [`generate_series_types_for_block()`](home%20version.py)
    - Balanceo automático de 15 series (5 iteraciones × 3 reglas)
    - Validación de no repetición entre iteraciones
 
-3. **Retroalimentación visual mejorada**
-   - ✓ verde para respuestas correctas
-   - ✗ roja para respuestas incorrectas
-   - Funciones `draw_check()` y `draw_cross()`
+5. **Modo Debug Mejorado**
+   - Visualización de todos los triggers enviados
+   - Información detallada de reglas y respuestas
+   - Control adicional con tecla `P` para saltar bloques
 
-4. **Validación de respuestas**
-   - Comparación dinámica según regla activa
-   - Extracción de atributos desde nombres de archivo
-   - Registro de tiempo de reacción
+### 🚧 En Desarrollo Futuro
 
-### 🚧 En Desarrollo
-
-1. **Sistema de triggers ampliado**
-   - Triggers específicos por bloque
-   - Triggers por tipo de regla
-   - Triggers por tipo de estímulo (Single/Double)
-   - Triggers de cambio de regla
-
-2. **Almacenamiento de datos**
-   - Escritura de CSV con respuestas
+1. **Almacenamiento de Datos CSV**
+   - Escritura automática de respuestas
    - Inclusión de metadata de reglas
    - Registro de series y transiciones
 
-3. **Análisis post-experimento**
+2. **Análisis Post-Experimento**
    - Cálculo de perseveraciones
    - Errores de mantenimiento de set
    - Curvas de aprendizaje
+   - Gráficos de desempeño
+
+3. **Interfaz de Configuración**
+   - Panel de configuración de triggers
+   - Selección de puerto desde GUI
+   - Personalización de tiempos
 
 ---
 
@@ -638,10 +926,13 @@ init_com(address="COM4")  # Usar puerto correcto
 
 - **Funciones Ejecutivas**: Heaton, R. K., Chelune, G. J., Talley, J. L., Kay, G. G., & Curtiss, G. (1993). *Wisconsin Card Sorting Test Manual: Revised and Expanded*. Psychological Assessment Resources.
 
+- **Marcadores EEG**: Duncan-Johnson, C. C., & Donchin, E. (1977). On quantifying surprise: The variation of event-related potentials with subjective probability. *Psychophysiology*, 14(5), 456-467.
+
 ### Documentación Técnica
 
 - **Pygame**: https://www.pygame.org/docs/
 - **PySerial**: https://pyserial.readthedocs.io/
+- **DLPortIO**: https://real.kiev.ua/avreal/download/
 
 ---
 
@@ -651,10 +942,11 @@ Para preguntas, reportar bugs o solicitar nuevas funcionalidades:
 
 - **Email**: herman.valencia.inf@gmail.com
 - **Issues**: https://github.com/HeRm4nV/Wisconsin-2026/issues
+- **Documentación**: Ver [`home version.py`](home%20version.py) para detalles de implementación
 
 ---
 
-**Última actualización**: 30 de enero de 2026  
-**Versión del documento**: 2.0  
-**Versión del código**: 0.2
-**Estado**: ✅ Funcional | 🚧 Triggers en desarrollo
+**Última actualización**: 16 de Febrero de 2026  
+**Versión del documento**: 3.0  
+**Versión del código**: 1.0  
+**Estado**: ✅ Funcional | ✅ Sistema de Triggers Completo
