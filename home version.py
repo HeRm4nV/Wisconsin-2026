@@ -102,8 +102,14 @@ trigger_helper = {
     "first_correct": 141,
     "second_correct": 161,
     "other_correct": 181,
+    "last_feedback_104": 205,
+    "last_feedback_106": 210,
+    "last_feedback_108": 215,
+    "last_feedback_141": 220,
+    "last_feedback_161": 225,
+    "last_feedback_181": 230,
 
-    
+    "last_target_card": 235,   
 
     "start_experiment": 254,
     "end_experiment": 255,
@@ -114,6 +120,17 @@ trigger_helper = {
 base_images_loaded = False
 base_images_list = []
 type_orders = ["number", "figure", "color"]
+
+translate_helper = {
+    "amarilla": "yellow",
+    "roja": "red",
+    "verde": "green",
+    "azul": "blue",
+    "estrella": "star",
+    "triangulo": "triangle",
+    "cruz": "cross",
+    "circulo": "circle",
+}
 
 # ==============================
 # Experiment Metadata
@@ -659,8 +676,9 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
     image_count = -1
     serie_count = 0
 
-    starting_block = True
+    send_trigger(trigger_helper[f"block_{block}_start"], lpt_address, trigger_latency)
 
+    send_trigger(trigger_helper["fixation"], lpt_address, trigger_latency)
     screen.fill(background)
     screen.blit(fix, fixbox)
     pygame.display.update(fixbox)
@@ -670,6 +688,14 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
     answers_list = []
 
     actual_phase = 2
+
+    first_stimulus_trigger_sent = False
+
+    corrects_in_series = 0
+    incorrects_in_series = 0
+    last_answer_correct = None
+    last_feedback = None
+    last_image = None
 
     while not done:
         for event in pygame.event.get():
@@ -681,31 +707,58 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
 
             elif event.type == phase_change:
                 if actual_phase == 1: # Fixation Phase
+                    send_trigger(trigger_helper["fixation"], lpt_address, trigger_latency)
                     screen.fill(background)
                     screen.blit(fix, fixbox)
                     pygame.display.update(fixbox)
                     pygame.display.flip()
                     #sleepy_trigger(1, trigger_latency)
-                    if starting_block:
-                        pygame.time.set_timer(phase_change, 600, loops=1)
-                        starting_block = False
-                    else:
-                        pygame.time.set_timer(phase_change, randint(1500, 2000), loops=1)
+                    pygame.time.set_timer(phase_change, randint(1500, 2000), loops=1)
                     actual_phase = 2
                 elif actual_phase == 2: # Target Card Presentation Phase
                     image_count += 1
                     if image_list[serie_count]["serie_size"] <= image_count:
+                        send_trigger(trigger_helper["first_stimulus_per_serie"], lpt_address, trigger_latency)
+                        send_trigger(trigger_helper[f"actual_rule_{series_types[serie_count]}"], lpt_address, trigger_latency)
                         image_count = 0
                         serie_count += 1
+                        corrects_in_series = 0
+                        incorrects_in_series = 0
                         if serie_count >= len(image_list):
                             done = True
                             break
+                    elif image_list[serie_count]["serie_size"] - 1 == image_count:
+                        last_image = True
                     
+                    if not first_stimulus_trigger_sent:
+                        send_trigger(trigger_helper["first_stimulus_per_serie"], trigger_latency)
+                        send_trigger(trigger_helper[f"actual_rule_{series_types[serie_count]}"], lpt_address, trigger_latency)
+                        first_stimulus_trigger_sent = True
+
+                    if last_feedback is not None:
+                        send_trigger(trigger_helper[last_feedback], lpt_address, trigger_latency)
+                        last_feedback = None
+
+                    if last_image:
+                        send_trigger(trigger_helper["last_target_card"], lpt_address, trigger_latency)
+
+                    # obtenemos los datos de la carta actual
+                    card_color = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[0]
+                    card_number = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[1]
+                    card_figure = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[2]
+
+                    send_trigger(trigger_helper[f"{card_color}_card"], lpt_address, trigger_latency)
+                    send_trigger(trigger_helper[f"{card_figure}_card"], lpt_address, trigger_latency)
+                    send_trigger(trigger_helper[f"number_{card_number}_card"], lpt_address, trigger_latency)
+
                     show_image_trial(image_list[serie_count]["order"][image_count], 300)
                     #sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
                     print(serie_count, image_count)
 
                     answer = wait_answer(image_list[serie_count]["order"][image_count], series_types[serie_count])
+
+                    send_trigger(trigger_helper[f"answer_{answer['selected_answer'] + 1}"], lpt_address, trigger_latency)  # Trigger according to selected answer
+
                     answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
                     screen.fill(background)
                     pygame.display.flip()
@@ -714,9 +767,38 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
                 elif actual_phase == 3: # Response Feedback Phase
                     # Lanzamiento de trigger según la respuesta
                     if answer['is_correct']:
-                        sleepy_trigger(trigger_helper["correct_response"], trigger_latency)
+                        send_trigger(trigger_helper["correct_response"], lpt_address, trigger_latency)
+
+                        corrects_in_series += 1
+
+                        if corrects_in_series == 1:
+                            send_trigger(trigger_helper["first_correct"], lpt_address, trigger_latency)
+                        elif corrects_in_series == 2:
+                            send_trigger(trigger_helper["second_correct"], lpt_address, trigger_latency)
+                        else:
+                            send_trigger(trigger_helper["other_correct"], lpt_address, trigger_latency)
+
+                        last_answer_correct = True
+
                     else:
-                        sleepy_trigger(trigger_helper["incorrect_response"], trigger_latency)
+                        send_trigger(trigger_helper["incorrect_response"], lpt_address, trigger_latency)
+
+                        incorrects_in_series += 1
+
+                        if incorrects_in_series == 1:
+                            send_trigger(trigger_helper["first_error"], lpt_address, trigger_latency)
+                        elif incorrects_in_series == 2:
+                            send_trigger(trigger_helper["second_error"], lpt_address, trigger_latency)
+                        else:
+                            send_trigger(trigger_helper["other_error"], lpt_address, trigger_latency)
+
+                        if last_answer_correct is not None and not last_answer_correct:
+                            send_trigger(trigger_helper["error_between_correct"], lpt_address, trigger_latency)
+
+                        last_answer_correct = False
+
+                    if not last_image:
+                        last_feedback = "last_feedback_" + ("141" if answer['is_correct'] else "104") if (corrects_in_series == 1 or incorrects_in_series == 1) else ("last_feedback_" + ("161" if answer['is_correct'] else "106") if (corrects_in_series == 2 or incorrects_in_series == 2) else "last_feedback_" + ("181" if answer['is_correct'] else "108"))
                     
                     screen.fill(background)
                     
@@ -751,6 +833,8 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
         dfile.flush()
     else:
         print("Error al cargar el archivo de datos")
+
+    send_trigger(trigger_helper[f"block_{block}_end"], lpt_address, trigger_latency)
 
 # ==============================
 # Block / Series Generation
