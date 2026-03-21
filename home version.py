@@ -12,7 +12,7 @@ tested in Python 3.11
 # ==============================
 # Imports
 # ==============================
-import pygame, sys, serial, zipfile
+import pygame, sys, serial, zipfile, os
 from random import shuffle, randint
 from pathlib import Path
 from datetime import datetime
@@ -43,6 +43,7 @@ from pygame.locals import (
 # - If True: print information and save intermediate files
 # - If False: silent execution, minimal output
 debug = False
+fast_debug_test = False  # If True, skips waiting for user input and runs through the experiment quickly for testing purposes
 
 # Base directory of the script
 BASE_DIR = Path(__file__).resolve().parent
@@ -57,8 +58,7 @@ FullScreenShow = True  # Automatically start in fullscreen mode
 test_name = "Wisconsin Task"
 date_name = strftime("%Y-%m-%d_%H-%M-%S", gmtime())
 
-# Port address and triggers
-lpt_address = 0xD100
+# Triggers
 trigger_latency = 5
 start_trigger = 254
 stop_trigger = 255
@@ -117,6 +117,7 @@ trigger_helper = {
 
 # Global Variables
 
+series_tracking_counter = 0
 base_images_loaded = False
 base_images_list = []
 type_orders = ["number", "figure", "color"]
@@ -124,12 +125,18 @@ type_orders = ["number", "figure", "color"]
 translate_helper = {
     "amarilla": "yellow",
     "roja": "red",
+    "amarillo": "yellow",
+    "rojo": "red",
     "verde": "green",
     "azul": "blue",
     "estrella": "star",
     "triangulo": "triangle",
     "cruz": "cross",
     "circulo": "circle",
+    "1": "1",
+    "2": "2",
+    "3": "3",
+    "4": "4"
 }
 
 # ==============================
@@ -315,32 +322,6 @@ def build_deck_plan(series_sizes, deck_sizes):
 # ==============================
 # EEG / Trigger Functions
 # ==============================
-
-def init_lpt(address):
-    """Creates and tests a parallel port connection."""
-    try:
-        from ctypes import windll
-        global io
-        io = windll.dlportio  # requires dlportio.dll
-        print('Parallel port opened')
-    except Exception:
-        print("Parallel port could not be opened")
-
-    try:
-        io.DlPortWritePortUchar(address, 0)
-        print('Parallel port initialized to zero')
-    except Exception:
-        print('Failed to send initial zero trigger')
-
-def send_trigger(trigger, address, latency):
-    """Sends a trigger to the parallel port."""
-    try:
-        io.DlPortWritePortUchar(address, trigger)
-        pygame.time.delay(latency)
-        io.DlPortWritePortUchar(address, 0)
-        print(f'Trigger {trigger} sent')
-    except Exception:
-        print(f'Failed to send trigger {trigger}')
 
 def init_com(address="COM3"):
     """Initializes a serial port connection."""
@@ -629,14 +610,15 @@ def wait_answer(image, series_type):
                     selected_answer = answer_keys[event.key]
                     rt = pygame.time.get_ticks() - start_time
 
-                    if static_images_list[answer_keys[event.key]].parts[-1].split('.')[0].split('_')[correct_answer] == image.parts[-1].split(".")[0].split('_')[correct_answer]:
+                    if translate_helper[static_images_list[answer_keys[event.key]].parts[-1].split('.')[0].split('_')[correct_answer]] == translate_helper[image.parts[-1].split(".")[0].split('_')[correct_answer]]:
                         is_correct = True
                     else:
                         is_correct = False
 
                     waiting = False
 
-    return {'selected_answer': selected_answer,
+    return {'series_type': series_type,
+            'selected_answer': selected_answer,
             'is_correct': is_correct,
             'rt': rt,}
 
@@ -676,9 +658,9 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
     image_count = -1
     serie_count = 0
 
-    send_trigger(trigger_helper[f"block_{block}_start"], lpt_address, trigger_latency)
+    send_trigger(trigger_helper[f"block_{block}_start"])
 
-    send_trigger(trigger_helper["fixation"], lpt_address, trigger_latency)
+    send_trigger(trigger_helper["fixation"])
     screen.fill(background)
     screen.blit(fix, fixbox)
     pygame.display.update(fixbox)
@@ -697,135 +679,148 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
     last_feedback = None
     last_image = None
 
-    while not done:
-        for event in pygame.event.get():
-            if event.type == KEYUP and event.key == K_ESCAPE and debug:
-                pygame_exit()
+    if fast_debug_test:
+        while not done:
+            image_count += 1
+            if image_list[serie_count]["serie_size"] <= image_count:
+                image_count = 0
+                serie_count += 1
+                if serie_count >= len(image_list):
+                    done = True
+                    break
+            
+            card_number = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[0]
+            card_figure = translate_helper[image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[1]]
+            card_color = translate_helper[image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[2]]
 
-            elif event.type == KEYUP and event.key == K_p and debug:
-                done = True
+    else:
+        while not done:
+            for event in pygame.event.get():
+                if event.type == KEYUP and event.key == K_ESCAPE and debug:
+                    pygame_exit()
 
-            elif event.type == phase_change:
-                if actual_phase == 1: # Fixation Phase
-                    send_trigger(trigger_helper["fixation"], lpt_address, trigger_latency)
-                    screen.fill(background)
-                    screen.blit(fix, fixbox)
-                    pygame.display.update(fixbox)
-                    pygame.display.flip()
-                    #sleepy_trigger(1, trigger_latency)
-                    pygame.time.set_timer(phase_change, randint(1500, 2000), loops=1)
-                    actual_phase = 2
-                elif actual_phase == 2: # Target Card Presentation Phase
-                    image_count += 1
-                    if image_list[serie_count]["serie_size"] <= image_count:
-                        image_count = 0
-                        serie_count += 1
-                        corrects_in_series = 0
-                        incorrects_in_series = 0
-                        if serie_count >= len(image_list):
-                            done = True
-                            break
-                        first_stimulus_trigger_sent = False
+                elif event.type == KEYUP and event.key == K_p and debug:
+                    done = True
+
+                elif event.type == phase_change:
+                    if actual_phase == 1: # Fixation Phase
+                        send_trigger(trigger_helper["fixation"])
+                        screen.fill(background)
+                        screen.blit(fix, fixbox)
+                        pygame.display.update(fixbox)
+                        pygame.display.flip()
+                        #sleepy_trigger(1, trigger_latency)
+                        pygame.time.set_timer(phase_change, randint(1500, 2000), loops=1)
+                        actual_phase = 2
+                    elif actual_phase == 2: # Target Card Presentation Phase
+                        image_count += 1
+                        if image_list[serie_count]["serie_size"] <= image_count:
+                            image_count = 0
+                            serie_count += 1
+                            corrects_in_series = 0
+                            incorrects_in_series = 0
+                            if serie_count >= len(image_list):
+                                done = True
+                                break
+                            first_stimulus_trigger_sent = False
+                            
+                        elif image_list[serie_count]["serie_size"] - 1 == image_count:
+                            last_image = True
                         
-                    elif image_list[serie_count]["serie_size"] - 1 == image_count:
-                        last_image = True
-                    
-                    if not first_stimulus_trigger_sent:
-                        send_trigger(trigger_helper["first_stimulus_per_serie"], trigger_latency)
-                        send_trigger(trigger_helper[f"actual_rule_{series_types[serie_count]}"], lpt_address, trigger_latency)
-                        first_stimulus_trigger_sent = True
+                        if not first_stimulus_trigger_sent:
+                            send_trigger(trigger_helper["first_stimulus_per_serie"])
+                            send_trigger(trigger_helper[f"actual_rule_{series_types[serie_count]}"])
+                            first_stimulus_trigger_sent = True
 
-                    if last_feedback is not None:
-                        send_trigger(trigger_helper[last_feedback], lpt_address, trigger_latency)
-                        last_feedback = None
+                        if last_feedback is not None:
+                            send_trigger(trigger_helper[last_feedback])
+                            last_feedback = None
 
-                    if last_image:
-                        send_trigger(trigger_helper["last_target_card"], lpt_address, trigger_latency)
+                        if last_image:
+                            send_trigger(trigger_helper["last_target_card"])
 
-                    # obtenemos los datos de la carta actual
-                    card_color = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[0]
-                    card_number = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[1]
-                    card_figure = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[2]
+                        # obtenemos los datos de la carta actual
+                        card_number = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[0]
+                        card_figure = translate_helper[image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[1]]
+                        card_color = translate_helper[image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[2]]
 
-                    send_trigger(trigger_helper[f"{card_color}_card"], lpt_address, trigger_latency)
-                    send_trigger(trigger_helper[f"{card_figure}_card"], lpt_address, trigger_latency)
-                    send_trigger(trigger_helper[f"number_{card_number}_card"], lpt_address, trigger_latency)
+                        send_trigger(trigger_helper[f"{card_color}_card"])
+                        send_trigger(trigger_helper[f"{card_figure}_card"])
+                        send_trigger(trigger_helper[f"number_{card_number}_card"])
 
-                    show_image_trial(image_list[serie_count]["order"][image_count], 300)
-                    #sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
-                    print(serie_count, image_count)
+                        show_image_trial(image_list[serie_count]["order"][image_count], 300)
+                        #sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
+                        print(serie_count, image_count)
 
-                    answer = wait_answer(image_list[serie_count]["order"][image_count], series_types[serie_count])
+                        answer = wait_answer(image_list[serie_count]["order"][image_count], series_types[serie_count])
 
-                    send_trigger(trigger_helper[f"answer_{answer['selected_answer'] + 1}"], lpt_address, trigger_latency)  # Trigger according to selected answer
+                        send_trigger(trigger_helper[f"answer_{answer['selected_answer'] + 1}"])  # Trigger according to selected answer
 
-                    answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
-                    screen.fill(background)
-                    pygame.display.flip()
-                    pygame.time.set_timer(phase_change, 200, loops=1)
-                    actual_phase = 3
-                elif actual_phase == 3: # Response Feedback Phase
-                    # Lanzamiento de trigger según la respuesta
-                    if answer['is_correct']:
-                        send_trigger(trigger_helper["correct_response"], lpt_address, trigger_latency)
+                        answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
+                        screen.fill(background)
+                        pygame.display.flip()
+                        pygame.time.set_timer(phase_change, 200, loops=1)
+                        actual_phase = 3
+                    elif actual_phase == 3: # Response Feedback Phase
+                        # Lanzamiento de trigger según la respuesta
+                        if answer['is_correct']:
+                            send_trigger(trigger_helper["correct_response"])
 
-                        corrects_in_series += 1
+                            corrects_in_series += 1
 
-                        if corrects_in_series == 1:
-                            send_trigger(trigger_helper["first_correct"], lpt_address, trigger_latency)
-                        elif corrects_in_series == 2:
-                            send_trigger(trigger_helper["second_correct"], lpt_address, trigger_latency)
+                            if corrects_in_series == 1:
+                                send_trigger(trigger_helper["first_correct"])
+                            elif corrects_in_series == 2:
+                                send_trigger(trigger_helper["second_correct"])
+                            else:
+                                send_trigger(trigger_helper["other_correct"])
+
+                            last_answer_correct = True
+
                         else:
-                            send_trigger(trigger_helper["other_correct"], lpt_address, trigger_latency)
+                            send_trigger(trigger_helper["incorrect_response"])
 
-                        last_answer_correct = True
+                            incorrects_in_series += 1
 
-                    else:
-                        send_trigger(trigger_helper["incorrect_response"], lpt_address, trigger_latency)
+                            if incorrects_in_series == 1:
+                                send_trigger(trigger_helper["first_error"])
+                            elif incorrects_in_series == 2:
+                                send_trigger(trigger_helper["second_error"])
+                            else:
+                                send_trigger(trigger_helper["other_error"])
 
-                        incorrects_in_series += 1
+                            if last_answer_correct is not None and not last_answer_correct:
+                                send_trigger(trigger_helper["error_between_correct"])
 
-                        if incorrects_in_series == 1:
-                            send_trigger(trigger_helper["first_error"], lpt_address, trigger_latency)
-                        elif incorrects_in_series == 2:
-                            send_trigger(trigger_helper["second_error"], lpt_address, trigger_latency)
+                            last_answer_correct = False
+
+                        if not last_image:
+                            last_feedback = "last_feedback_" + ("141" if answer['is_correct'] else "104") if (corrects_in_series == 1 or incorrects_in_series == 1) else ("last_feedback_" + ("161" if answer['is_correct'] else "106") if (corrects_in_series == 2 or incorrects_in_series == 2) else "last_feedback_" + ("181" if answer['is_correct'] else "108"))
+                        
+                        screen.fill(background)
+                        
+                        if answer['is_correct']:
+                            draw_check((0, 200, 0), center, 120)
                         else:
-                            send_trigger(trigger_helper["other_error"], lpt_address, trigger_latency)
+                            draw_cross((200, 0, 0), center, 120)
 
-                        if last_answer_correct is not None and not last_answer_correct:
-                            send_trigger(trigger_helper["error_between_correct"], lpt_address, trigger_latency)
-
-                        last_answer_correct = False
-
-                    if not last_image:
-                        last_feedback = "last_feedback_" + ("141" if answer['is_correct'] else "104") if (corrects_in_series == 1 or incorrects_in_series == 1) else ("last_feedback_" + ("161" if answer['is_correct'] else "106") if (corrects_in_series == 2 or incorrects_in_series == 2) else "last_feedback_" + ("181" if answer['is_correct'] else "108"))
-                    
-                    screen.fill(background)
-                    
-                    if answer['is_correct']:
-                        draw_check((0, 200, 0), center, 120)
-                    else:
-                        draw_cross((200, 0, 0), center, 120)
-
-                    pygame.display.flip()
-                    pygame.time.set_timer(phase_change, 1500, loops=1)
-                    actual_phase = 1
+                        pygame.display.flip()
+                        pygame.time.set_timer(phase_change, 1500, loops=1)
+                        actual_phase = 1
                     
     pygame.time.set_timer(phase_change, 0)
-
+    
     pygame.event.clear()                    # CLEAR EVENTS
 
     # acá se almacenará la answers_list en el archivo dfile
     if dfile is not None:
         for answer in answers_list:
-            # Unir la lista con guiones en lugar de comas
-            dfile.write("%s,%s,%s,%s,%s,%s,%s,%s,%s\n" % (uid,
-                                                    (Path(answer[0][0]).relative_to(script_path)).parts[-1].split('.')[0],
+            # ("Sujeto", "IdImagen", "Bloque", "TReaccion", "TipoSerie", "Respuesta", "Acierto")
+            dfile.write("%s,%s,%s,%s,%s,%s,%s\n" % (uid,
+                                                    (Path(answer[0]).relative_to(BASE_DIR)).parts[-1].split('.')[0],
                                                     block,
                                                     answer[1]['rt'],
-                                                    (Path(answer[0][0]).relative_to(script_path)).parts[2],
-                                                    answer[0][1],
-                                                    "Cara" if block == 1 else "Palabra",
+                                                    answer[1]['series_type'],
                                                     answer[1]['selected_answer'],
                                                     int(answer[1]['is_correct']) if answer[1]['is_correct'] is not None else ""
                                                  ))
@@ -834,13 +829,15 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
     else:
         print("Error al cargar el archivo de datos")
 
-    send_trigger(trigger_helper[f"block_{block}_end"], lpt_address, trigger_latency)
+    send_trigger(trigger_helper[f"block_{block}_end"])
 
 # ==============================
 # Block / Series Generation
 # ==============================
 
 def initialize_series(series_stacks, cut, deck_cursor):
+    global series_tracking_counter
+
     """
     Initialize series for a given cut using DeckCursor.
     1) Reserve only the proportional singles and doubles needed for this cut.
@@ -886,14 +883,50 @@ def initialize_series(series_stacks, cut, deck_cursor):
     # ==============================
     # Step 1: Add 2 mandatory singles to each empty series in the cut
     # ==============================
-    for serie_index in range(from_series, to_series + 1):
+
+    #series_tracking_counter = 0  # Counter to track how many cards have been assigned to series so far
+
+    for serie_index in range(from_series - 1, to_series + 1):
+        if serie_index == -1:
+            continue  # Skip if from_series is 0 and we are checking the series before the first one
+        
         serie = series_stacks[serie_index]
-        if not serie["initialized"]:
-            for _ in range(2):
-                if not current_singles:
-                    raise RuntimeError("Not enough Singles for mandatory 2 per series")
+
+        if serie["initialized"]:
+            continue  # Skip already initialized series
+
+        if not serie["initialized"] and serie_index < to_series:
+            if len(serie["order"]) == 0:  # Only add 2 mandatory singles if the series is currently empty else we add 1 single to avoid overfilling
+                for _ in range(2):
+                    if not current_singles:
+                        raise RuntimeError("Not enough Singles for mandatory 2 per series")
+                    serie["order"].append(current_singles.pop(0))
+            else:
                 serie["order"].append(current_singles.pop(0))
+            series_tracking_counter += series_stacks[serie_index]["serie_size"]
             serie["initialized"] = True
+
+            print(serie_index, to_series, series_stacks[serie_index]["serie_size"], series_tracking_counter, deck_size_to_use) if debug else None
+
+        elif not serie["initialized"] and serie_index == to_series:
+            # If the last series in the cut is empty, we can only add 1 mandatory single to avoid overfilling
+            if series_tracking_counter == deck_size_to_use - 1:
+                serie["order"].append(current_singles.pop(0))
+                if debug:
+                    print(f"[DEBUG] Last series in cut {cut['deck_index'] + 1} can only take 1 mandatory single to avoid overfilling")
+            else:
+                for _ in range(2):
+                    if not current_singles:
+                        raise RuntimeError("Not enough Singles for mandatory 2 per series")
+                    serie["order"].append(current_singles.pop(0))
+                series_tracking_counter += series_stacks[serie_index]["serie_size"]
+                serie["initialized"] = True
+
+            print(serie_index, to_series, series_stacks[serie_index]["serie_size"], series_tracking_counter, deck_size_to_use) if debug else None
+
+            print("last series in cut", cut['deck_index'] + 1, "actual size counter:", series_tracking_counter, "deck size to use:", deck_size_to_use) if debug else None
+            series_tracking_counter -= deck_size_to_use # Adjust counter after filling the last series in the cut
+            print("after filling last series in cut", cut['deck_index'] + 1, "actual size counter:", series_tracking_counter) if debug else None
 
     # ==============================
     # Step 2: Mix remaining singles with doubles and fill series
@@ -1078,7 +1111,7 @@ def generate_series_types_for_block():
 # Debug Validation
 # ==============================
 
-def create_debug_zip(debug_base_dir, zip_name, debug=True):
+def create_debug_zip(debug_base_dir, zip_name):
 
     debug_base_dir = Path(debug_base_dir)
     zip_path = debug_base_dir / zip_name
@@ -1098,12 +1131,40 @@ def create_debug_zip(debug_base_dir, zip_name, debug=True):
 
 def main():
 
-    init()
+    init_com()
+
+    # Si no existe la carpeta data se crea
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
 
     # if not media folders exist, exit
     if not single_cards_dir.exists() or not double_cards_dir.exists():
         print("Media folders not found. Please ensure the 'media/images/Single' and 'media/images/Double' directories exist.")
         return
+    
+    correct_sub_name = False
+    first_round = True
+
+    while not correct_sub_name:
+        os.system('cls')
+        if not first_round:
+            print("ID ingresado no cumple con las condiciones, contacte con el encargado...")
+
+        first_round = False
+        subj_name = input(
+            "Ingrese el ID del participante y presione ENTER para iniciar: ")
+        
+        if subj_name == "" or not subj_name:
+            continue
+        else:
+            break
+
+    csv_name = date_name + '_' + subj_name + '.csv'
+    dfile = open(DATA_DIR/csv_name, 'w')
+    dfile.write("%s,%s,%s,%s,%s,%s,%s\n" % ("Sujeto", "IdImagen", "Bloque", "TReaccion", "TipoSerie", "Respuesta", "Acierto"))
+    dfile.flush()
+
+    init()
 
     # Block series stacks generation and debug files
     block_stacks = block_creation()
@@ -1114,7 +1175,8 @@ def main():
 
     for block_number, block in enumerate(block_stacks):
         series_types = generate_series_types_for_block()
-        show_images(block, uid="TestSubject", dfile=None, block=block_number + 1, series_types=series_types)
+        show_images(block, uid=subj_name, dfile=dfile
+                    , block=block_number + 1, series_types=series_types)
 
         # if not the last block, show break screen
         if block_number < len(block_stacks) - 1:

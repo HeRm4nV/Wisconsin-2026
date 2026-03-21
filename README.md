@@ -7,10 +7,10 @@ Este experimento implementa una versión adaptada del **Wisconsin Card Sorting T
 ## Información del Experimento
 
 - **Nombre**: Wisconsin Task
-- **Versión**: 1.0
+- **Versión**: 1.1
 - **Python Version**: 3.11
 - **Autor**: Herman Valencia
-- **Estado**: ✅ Funcional | ✅ Sistema de Triggers Completo
+- **Estado**: ✅ Funcional | ✅ Sistema de Triggers Actualizado
 
 ---
 
@@ -252,9 +252,9 @@ Muchas gracias por su colaboración!!
 
 ### Configuración del Sistema
 
-El sistema de triggers está completamente implementado y soporta tanto puerto paralelo (LPT) como puerto serial (COM).
+El sistema de triggers está implementado y soporta tanto puerto paralelo (LPT) como puerto serial (COM).
 
-**Configuración en el código**:
+**Parámetros en el código**:
 ```python
 lpt_address = 0xD100       # Dirección del puerto paralelo
 trigger_latency = 5        # Latencia en milisegundos
@@ -854,7 +854,7 @@ init_com(address="COM4")  # Usar puerto correcto
 
 ### 6. Sistema de Triggers
 - Los triggers se envían de forma **síncrona** con los eventos visuales
-- La latencia de 5ms asegura recepción confiable
+- La latencia de 5ms se usa por defecto (ajustable)
 - Todos los triggers importantes se documentan en la consola (modo debug)
 - El sistema soporta tanto puerto paralelo como serial
 
@@ -866,55 +866,31 @@ init_com(address="COM4")  # Usar puerto correcto
 
 ---
 
-## Cambios en Versión 1.0
+## Cambios en Versión 1.1
 
 ### ✅ Nuevo en esta Versión
 
-1. **Sistema de Triggers Completo**
-   - 50+ triggers implementados para eventos específicos
-   - Soporte completo para puerto paralelo y serial
-   - Tracking de secuencias de aciertos y errores
-   - Triggers específicos para atributos de cartas (color, figura, número)
-   - Feedback diferenciado para última carta de serie
+1. Documentación y consolidación del sistema de triggers (códigos y ejemplos).
+2. Mejora de trazabilidad en modo debug: impresión de todos los triggers y detalle de bloques.
+3. Se documenta soporte LPT y COM, recomendaciones de latencia y uso de sleepy_trigger.
+4. Actualización de la versión del experimento en README a 1.1.
+5. Corrección en el manejo de series: la función initialize_series fue actualizada en el código para solucionar el caso límite en el que **solo queda una carta disponible para la última serie de un mazo** — ahora se añade únicamente 1 single cuando corresponde y se ajusta el contador interno para evitar sobrellenados o desbordes.
 
-2. **Validación de Respuestas Mejorada**
-   - Comparación dinámica según regla activa
-   - Extracción automática de atributos desde nombres de archivo
-   - Registro de tiempo de reacción
-   - Detección de patrones de error
+### 🚧 Notas detectadas / recomendaciones relacionadas con el código fuente
 
-3. **Retroalimentación Visual Mejorada**
-   - ✓ verde para respuestas correctas
-   - ✗ roja para respuestas incorrectas
-   - Funciones [`draw_check()`](home%20version.py) y [`draw_cross()`](home%20version.py)
+- Implementación de triggers:
+  - En versiones previas había observaciones sobre duplicidad de funciones `send_trigger`. En la versión actual del código solo existe la implementación por serial (`init_com` / `send_trigger` por COM). Si se desea soporte LPT directo, se recomienda implementar una función dedicada `send_trigger_lpt(...)` o encapsular ambas implementaciones en un handler que seleccione la interfaz activa.
+- `EXPERIMENT_VERSION` en el código actualmente está definido como `"0.1"`. Si la versión del código debe corresponder a la versión del experimento (1.1), actualizar en `home version.py`:
+  ```python
+  EXPERIMENT_VERSION = "1.1"
+  ```
+- `create_debug_zip(debug_base_dir, zip_name)`:
+  - En la implementación actual `zip_path = debug_base_dir / zip_name` y en la llamada se pasa un Path absoluto para `zip_name` (`DEBUG_DIR / "debug_blocks_...zip"`). Revisar la firma y la construcción de la ruta para evitar crear rutas incorrectas; se sugiere usar: `zip_path = Path(zip_name)` si `zip_name` ya es absoluto, o pasar solo el nombre de archivo y construir la ruta con `DEBUG_DIR`.
+- `initialize_series`:
+  - Se actualizó para manejar el caso borde en que solo queda una imagen para la última serie del mazo (ver punto 5 en "Nuevo en esta Versión"). Mantener pruebas en modo debug para verificar comportamiento en mazos con divisiones que dejan 1 carta sobrante.
+- Revisar contadores y lógica de índices en `initialize_series` y `build_deck_plan` si se observan comportamientos anómalos en casos límite (p. ej. series al límite entre mazos).
 
-4. **Generación de Reglas Balanceadas**
-   - Función [`generate_series_types_for_block()`](home%20version.py)
-   - Balanceo automático de 15 series (5 iteraciones × 3 reglas)
-   - Validación de no repetición entre iteraciones
-
-5. **Modo Debug Mejorado**
-   - Visualización de todos los triggers enviados
-   - Información detallada de reglas y respuestas
-   - Control adicional con tecla `P` para saltar bloques
-
-### 🚧 En Desarrollo Futuro
-
-1. **Almacenamiento de Datos CSV**
-   - Escritura automática de respuestas
-   - Inclusión de metadata de reglas
-   - Registro de series y transiciones
-
-2. **Análisis Post-Experimento**
-   - Cálculo de perseveraciones
-   - Errores de mantenimiento de set
-   - Curvas de aprendizaje
-   - Gráficos de desempeño
-
-3. **Interfaz de Configuración**
-   - Panel de configuración de triggers
-   - Selección de puerto desde GUI
-   - Personalización de tiempos
+Estas observaciones se añaden para mantener coherencia entre documentación y código. Corregir en el código solo si se desea cambiar el comportamiento actual.
 
 ---
 
@@ -946,7 +922,8 @@ Para preguntas, reportar bugs o solicitar nuevas funcionalidades:
 
 ---
 
-**Última actualización**: 16 de Febrero de 2026  
-**Versión del documento**: 3.0  
-**Versión del código**: 1.0  
-**Estado**: ✅ Funcional | ✅ Sistema de Triggers Completo
+**Última actualización**: 21 de marzo de 2026  
+**Versión del documento**: 3.1  
+**Versión del código**: 1.1  
+**Versión del experimento**: 1.1  
+**Estado**: ✅ Funcional | ✅ Triggers documentados y actualizados
