@@ -593,13 +593,6 @@ def wait_answer(image, series_type):
     waiting = True
     start_time = pygame.time.get_ticks()
 
-    
-    print(static_images_list)
-    
-    print(series_type)
-    print(correct_answer)
-    print("--------------------")
-
     while waiting:
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
@@ -750,7 +743,6 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
 
                         show_image_trial(image_list[serie_count]["order"][image_count], 300)
                         #sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
-                        print(serie_count, image_count)
 
                         answer = wait_answer(image_list[serie_count]["order"][image_count], series_types[serie_count])
 
@@ -759,7 +751,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
                         answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
                         screen.fill(background)
                         pygame.display.flip()
-                        pygame.time.set_timer(phase_change, 200, loops=1)
+                        pygame.time.set_timer(phase_change, randint(600, 800), loops=1)
                         actual_phase = 3
                     elif actual_phase == 3: # Response Feedback Phase
                         # Lanzamiento de trigger según la respuesta
@@ -922,10 +914,12 @@ def initialize_series(series_stacks, cut, deck_cursor):
                 series_tracking_counter += series_stacks[serie_index]["serie_size"]
                 serie["initialized"] = True
 
-            print(serie_index, to_series, series_stacks[serie_index]["serie_size"], series_tracking_counter, deck_size_to_use) if debug else None
+            if debug:
+                print(serie_index, to_series, series_stacks[serie_index]["serie_size"], series_tracking_counter, deck_size_to_use)
+                print("last series in cut", cut['deck_index'] + 1, "actual size counter:", series_tracking_counter, "deck size to use:", deck_size_to_use)
 
-            print("last series in cut", cut['deck_index'] + 1, "actual size counter:", series_tracking_counter, "deck size to use:", deck_size_to_use) if debug else None
             series_tracking_counter -= deck_size_to_use # Adjust counter after filling the last series in the cut
+
             print("after filling last series in cut", cut['deck_index'] + 1, "actual size counter:", series_tracking_counter) if debug else None
 
     # ==============================
