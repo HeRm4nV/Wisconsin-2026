@@ -751,7 +751,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
                         answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
                         screen.fill(background)
                         pygame.display.flip()
-                        pygame.time.set_timer(phase_change, randint(600, 800), loops=1)
+                        pygame.time.set_timer(phase_change, randint(800, 1000), loops=1)
                         actual_phase = 3
                     elif actual_phase == 3: # Response Feedback Phase
                         # Lanzamiento de trigger según la respuesta
