@@ -136,7 +136,10 @@ translate_helper = {
     "1": "1",
     "2": "2",
     "3": "3",
-    "4": "4"
+    "4": "4",
+    "figure": "tipo de figura",
+    "color": "color",
+    "number": "número"
 }
 
 # ==============================
@@ -365,7 +368,7 @@ def select_slide(slide_name, variables=None):
     """
 
     if variables is None:
-        variables = {"blockNumber": 0, "practice": False}
+        variables = {"blockNumber": 0, "practice": False, "trial_types": ["color", "color"]}
 
     basic_slides = {
         'welcome': [
@@ -392,6 +395,23 @@ def select_slide(slide_name, variables=None):
             u"B (tres cruces amarillas) y N (cuatro círculos azules).",
             "",
             u"Responde lo más rápido posible."
+        ],
+        'pretrial': [
+            u"Ahora comenzaremos con un bloque de práctica para que te familiarices con la tarea.",
+            "",
+            u"Las respuestas en este bloque no serán registradas ni evaluadas,", 
+            u"así que tómate tu tiempo para entender la dinámica."
+        ],
+        'posttrial': [
+            u"¡Bien hecho! Has completado el bloque de práctica.",
+            "",
+            u"Como pudiste ver, en este bloque de práctica primero tuviste que responder",
+            u"dependiendo del " + translate_helper[variables["trial_types"][0]] + " y luego del " + translate_helper[variables["trial_types"][1]],
+            "",
+            u"Ahora comenzaremos con el bloque 1.", 
+            "",
+            u"Recuerda que la regla puede cambiar en cualquier momento,", 
+            u"así que presta atención a la retroalimentación."
         ],
         'break': [
             u"Fin del bloque " + str(variables["blockNumber"] + 1) + ".",
@@ -643,7 +663,7 @@ def show_image_trial(image, scale):
     screen.blit(picture, [x - picture.get_size()[count]/2 for count, x in enumerate(center)])
     pygame.display.flip()
 
-def show_images(image_list, uid=None, dfile=None, block=None, series_types=None):
+def show_images(image_list, uid=None, dfile=None, block=None, series_types=None, trial_block=False):
 
     phase_change = USEREVENT + 2
 
@@ -651,7 +671,8 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
     image_count = -1
     serie_count = 0
 
-    send_trigger(trigger_helper[f"block_{block}_start"])
+    if not trial_block:
+        send_trigger(trigger_helper[f"block_{block}_start"])
 
     send_trigger(trigger_helper["fixation"])
     screen.fill(background)
@@ -821,7 +842,8 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None)
     else:
         print("Error al cargar el archivo de datos")
 
-    send_trigger(trigger_helper[f"block_{block}_end"])
+    if not trial_block:
+        send_trigger(trigger_helper[f"block_{block}_end"])
 
 # ==============================
 # Block / Series Generation
@@ -1071,6 +1093,42 @@ def block_creation():
 
         return list_of_all_blocks_series_stacks
     
+def trial_block_creation():
+    """
+    Generate a single block of series stacks for testing purposes.
+    This function creates a simplified version of the block creation process,
+    generating 15 series with random types and 6-8 images each, without
+    the complex deck cutting and card assignment logic.
+
+    Returns:
+        list[dict]: A list of 15 series stacks with randomized types and image orders.
+    """
+    base_types = ["number", "color", "figure"]
+    shuffle(base_types)
+
+    images_to_use = single_images_list.copy()
+    shuffle(images_to_use)
+
+    series_stacks = []
+
+    trial_types = []
+
+    for i in range(2):
+        serie_size = randint(6, 8)
+        serie_type = base_types[i]  # Rotate through types for balance
+        image_order = [images_to_use.pop() for _ in range(serie_size)]  # Take random images for the series
+        trial_types.append(serie_type)
+
+        series_stacks.append({
+            "serie_index": i,
+            "serie_size": serie_size,
+            "order": image_order,
+            "initialized": True,
+            "serie_type": serie_type
+        })
+
+    return series_stacks, trial_types
+    
 def generate_series_types_for_block():
     """
     Generate the ordered list of series types for a block.
@@ -1135,7 +1193,7 @@ def main():
     if not single_cards_dir.exists() or not double_cards_dir.exists():
         print("Media folders not found. Please ensure the 'media/images/Single' and 'media/images/Double' directories exist.")
         return
-    
+
     correct_sub_name = False
     first_round = True
 
@@ -1162,10 +1220,16 @@ def main():
 
     # Block series stacks generation and debug files
     block_stacks = block_creation()
-    
+
     send_trigger(start_trigger)
 
     paragraph(select_slide('instructions'), key = K_SPACE, no_foot = False)
+    paragraph(select_slide('pretrial'), key = K_SPACE, no_foot = False)
+
+    trial_block_series, trial_types = trial_block_creation()
+    show_images(trial_block_series, uid=subj_name, dfile=None, block=0, series_types=[serie["serie_type"] for serie in trial_block_series], trial_block=True)
+
+    paragraph(select_slide('posttrial', variables={"blockNumber": 0, "practice": True, "trial_types": trial_types}), key = K_SPACE, no_foot = False)
 
     for block_number, block in enumerate(block_stacks):
         series_types = generate_series_types_for_block()
