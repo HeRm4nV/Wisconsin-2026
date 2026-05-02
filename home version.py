@@ -1238,7 +1238,7 @@ def main():
 
         # if not the last block, show break screen
         if block_number < len(block_stacks) - 1:
-            paragraph(select_slide('break', variables={"blockNumber": block_number, "practice": False}), key = K_SPACE, no_foot = False)
+            paragraph(select_slide('break', variables={"blockNumber": block_number, "practice": False, "trial_types": trial_types}), key = K_SPACE, no_foot = False)
 
     paragraph(select_slide('farewell'), key = K_SPACE, no_foot = True)
     close_com()
