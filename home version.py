@@ -724,9 +724,12 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                         pygame.display.update(fixbox)
                         pygame.display.flip()
                         #sleepy_trigger(1, trigger_latency)
-                        pygame.time.set_timer(phase_change, randint(1500, 2000), loops=1)
+                        pygame.time.set_timer(phase_change, randint(1400, 1900), loops=1) # se dejará 100 ms de rango para los lanzamientos de trigger en la siguiente sección
                         actual_phase = 2
                     elif actual_phase == 2: # Target Card Presentation Phase
+                        # ms used on triggers
+                        triggers_load = 0
+
                         image_count += 1
                         if image_list[serie_count]["serie_size"] <= image_count:
                             image_count = 0
@@ -740,27 +743,36 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                             
                         elif image_list[serie_count]["serie_size"] - 1 == image_count:
                             last_image = True
+
+                        # obtenemos los datos de la carta actual
+                        card_color = translate_helper[image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[2]]
+                        card_figure = translate_helper[image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[1]]
+                        card_number = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[0]
                         
                         if not first_stimulus_trigger_sent:
-                            send_trigger(trigger_helper["first_stimulus_per_serie"])
-                            send_trigger(trigger_helper[f"actual_rule_{series_types[serie_count]}"])
+                            sleepy_trigger(trigger_helper["first_stimulus_per_serie"], 10)
+                            sleepy_trigger(trigger_helper[f"actual_rule_{series_types[serie_count]}"], 10)
+                            
+                            triggers_load += 20
+
                             first_stimulus_trigger_sent = True
 
                         if last_feedback is not None:
-                            send_trigger(trigger_helper[last_feedback])
+                            sleepy_trigger(trigger_helper[last_feedback], 10)
+                            triggers_load += 10
                             last_feedback = None
 
                         if last_image:
-                            send_trigger(trigger_helper["last_target_card"])
+                            sleepy_trigger(trigger_helper["last_target_card"], 10)
+                            triggers_load += 10
 
-                        # obtenemos los datos de la carta actual
-                        card_number = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[0]
-                        card_figure = translate_helper[image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[1]]
-                        card_color = translate_helper[image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[2]]
+                        sleepy_trigger(trigger_helper[f"{card_color}_card"], 10)
+                        sleepy_trigger(trigger_helper[f"{card_figure}_card"], 10)
+                        sleepy_trigger(trigger_helper[f"number_{card_number}_card"], 10)
 
-                        send_trigger(trigger_helper[f"{card_color}_card"])
-                        send_trigger(trigger_helper[f"{card_figure}_card"])
-                        send_trigger(trigger_helper[f"number_{card_number}_card"])
+                        triggers_load += 30
+
+                        pygame.time.wait(max(0, 100 - triggers_load))  # Adjust wait time to maintain consistent latency
 
                         show_image_trial(image_list[serie_count]["order"][image_count], 300)
                         #sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
@@ -772,43 +784,58 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                         answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
                         screen.fill(background)
                         pygame.display.flip()
-                        pygame.time.set_timer(phase_change, randint(800, 1000), loops=1)
+                        pygame.time.set_timer(phase_change, randint(700, 900), loops=1) # se dejará 100 ms de rango para los lanzamientos de trigger en la siguiente sección
                         actual_phase = 3
                     elif actual_phase == 3: # Response Feedback Phase
+
+                        triggers_load = 0
+
                         # Lanzamiento de trigger según la respuesta
                         if answer['is_correct']:
-                            send_trigger(trigger_helper["correct_response"])
+                            sleepy_trigger(trigger_helper["correct_response"], 10)
+                            triggers_load += 10
 
                             corrects_in_series += 1
 
                             if corrects_in_series == 1:
-                                send_trigger(trigger_helper["first_correct"])
+                                sleepy_trigger(trigger_helper["first_correct"], 10)
                             elif corrects_in_series == 2:
-                                send_trigger(trigger_helper["second_correct"])
+                                sleepy_trigger(trigger_helper["second_correct"], 10)
                             else:
-                                send_trigger(trigger_helper["other_correct"])
+                                sleepy_trigger(trigger_helper["other_correct"], 10)
+                            
+                            triggers_load += 10
 
                             last_answer_correct = True
 
                         else:
-                            send_trigger(trigger_helper["incorrect_response"])
+                            sleepy_trigger(trigger_helper["incorrect_response"], 10)
+
+                            triggers_load += 10
 
                             incorrects_in_series += 1
 
                             if incorrects_in_series == 1:
-                                send_trigger(trigger_helper["first_error"])
+                                sleepy_trigger(trigger_helper["first_error"], 10)
                             elif incorrects_in_series == 2:
-                                send_trigger(trigger_helper["second_error"])
+                                sleepy_trigger(trigger_helper["second_error"], 10)
                             else:
-                                send_trigger(trigger_helper["other_error"])
+                                sleepy_trigger(trigger_helper["other_error"], 10)
+
+                            triggers_load += 10
 
                             if last_answer_correct is not None and not last_answer_correct:
-                                send_trigger(trigger_helper["error_between_correct"])
+                                sleepy_trigger(trigger_helper["error_between_correct"], 10)
+                                triggers_load += 10
 
                             last_answer_correct = False
 
                         if not last_image:
                             last_feedback = "last_feedback_" + ("141" if answer['is_correct'] else "104") if (corrects_in_series == 1 or incorrects_in_series == 1) else ("last_feedback_" + ("161" if answer['is_correct'] else "106") if (corrects_in_series == 2 or incorrects_in_series == 2) else "last_feedback_" + ("181" if answer['is_correct'] else "108"))
+                        else:
+                            last_image = False
+                        
+                        pygame.time.wait(max(0, 100 - triggers_load))  # Adjust wait time to maintain consistent latency
                         
                         screen.fill(background)
                         
