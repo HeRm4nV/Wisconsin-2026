@@ -58,6 +58,10 @@ FullScreenShow = True  # Automatically start in fullscreen mode
 test_name = "Wisconsin Task"
 date_name = strftime("%Y-%m-%d_%H-%M-%S", gmtime())
 
+# Trigger balancing parameters
+trigger_gap = 100 # total of triggers gap between sections
+individual_trigger_gap = 10 # gap between triggers within the same section, used to adjust timing of trigger sending
+
 # Triggers
 trigger_latency = 5
 start_trigger = 254
@@ -724,7 +728,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                         pygame.display.update(fixbox)
                         pygame.display.flip()
                         #sleepy_trigger(1, trigger_latency)
-                        pygame.time.set_timer(phase_change, randint(1400, 1900), loops=1) # se dejará 100 ms de rango para los lanzamientos de trigger en la siguiente sección
+                        pygame.time.set_timer(phase_change, randint(1500 - trigger_gap, 2000 - trigger_gap), loops=1) # The trigger_gap (ms) range will be left for trigger launches in the following section.
                         actual_phase = 2
                     elif actual_phase == 2: # Target Card Presentation Phase
                         # ms used on triggers
@@ -772,7 +776,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
 
                         triggers_load += 30
 
-                        pygame.time.wait(max(0, 100 - triggers_load))  # Adjust wait time to maintain consistent latency
+                        pygame.time.wait(max(0, trigger_gap - triggers_load))  # Adjust wait time to maintain consistent latency
 
                         show_image_trial(image_list[serie_count]["order"][image_count], 300)
                         #sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
@@ -784,49 +788,49 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                         answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
                         screen.fill(background)
                         pygame.display.flip()
-                        pygame.time.set_timer(phase_change, randint(700, 900), loops=1) # se dejará 100 ms de rango para los lanzamientos de trigger en la siguiente sección
+                        pygame.time.set_timer(phase_change, randint(800 - trigger_gap, 1000 - trigger_gap), loops=1) # The trigger_gap (ms) range will be left for trigger launches in the following section.
                         actual_phase = 3
                     elif actual_phase == 3: # Response Feedback Phase
 
                         triggers_load = 0
 
-                        # Lanzamiento de trigger según la respuesta
+                        # Trigger launch based on the response
                         if answer['is_correct']:
-                            sleepy_trigger(trigger_helper["correct_response"], 10)
-                            triggers_load += 10
+                            sleepy_trigger(trigger_helper["correct_response"], individual_trigger_gap)
+                            triggers_load += individual_trigger_gap
 
                             corrects_in_series += 1
 
                             if corrects_in_series == 1:
-                                sleepy_trigger(trigger_helper["first_correct"], 10)
+                                sleepy_trigger(trigger_helper["first_correct"], individual_trigger_gap)
                             elif corrects_in_series == 2:
-                                sleepy_trigger(trigger_helper["second_correct"], 10)
+                                sleepy_trigger(trigger_helper["second_correct"], individual_trigger_gap)
                             else:
-                                sleepy_trigger(trigger_helper["other_correct"], 10)
+                                sleepy_trigger(trigger_helper["other_correct"], individual_trigger_gap)
                             
-                            triggers_load += 10
+                            triggers_load += individual_trigger_gap * 3
 
                             last_answer_correct = True
 
                         else:
-                            sleepy_trigger(trigger_helper["incorrect_response"], 10)
+                            sleepy_trigger(trigger_helper["incorrect_response"], individual_trigger_gap)
 
-                            triggers_load += 10
+                            triggers_load += individual_trigger_gap
 
                             incorrects_in_series += 1
 
                             if incorrects_in_series == 1:
-                                sleepy_trigger(trigger_helper["first_error"], 10)
+                                sleepy_trigger(trigger_helper["first_error"], individual_trigger_gap)
                             elif incorrects_in_series == 2:
-                                sleepy_trigger(trigger_helper["second_error"], 10)
+                                sleepy_trigger(trigger_helper["second_error"], individual_trigger_gap)
                             else:
-                                sleepy_trigger(trigger_helper["other_error"], 10)
+                                sleepy_trigger(trigger_helper["other_error"], individual_trigger_gap)
 
-                            triggers_load += 10
+                            triggers_load += individual_trigger_gap
 
                             if last_answer_correct is not None and not last_answer_correct:
-                                sleepy_trigger(trigger_helper["error_between_correct"], 10)
-                                triggers_load += 10
+                                sleepy_trigger(trigger_helper["error_between_correct"], individual_trigger_gap)
+                                triggers_load += individual_trigger_gap
 
                             last_answer_correct = False
 
@@ -835,7 +839,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                         else:
                             last_image = False
                         
-                        pygame.time.wait(max(0, 100 - triggers_load))  # Adjust wait time to maintain consistent latency
+                        pygame.time.wait(max(0, trigger_gap - triggers_load))  # Adjust wait time to maintain consistent latency
                         
                         screen.fill(background)
                         
