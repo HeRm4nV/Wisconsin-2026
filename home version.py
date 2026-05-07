@@ -69,6 +69,8 @@ stop_trigger = 255
 
 trigger_helper = {
     "fixation": 70,
+    "stimulus_onset": 80,
+    "feedback_trigger": 90,
     "block_1_start": 1,
     "block_2_start": 2,
     "block_3_start": 3,
@@ -778,6 +780,8 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
 
                         pygame.time.wait(max(0, trigger_gap - triggers_load))  # Adjust wait time to maintain consistent latency
 
+                        send_trigger(trigger_helper["stimulus_onset"])  # Stimulus onset trigger after all other triggers to maintain consistent timing of stimulus presentation in relation to triggers
+
                         show_image_trial(image_list[serie_count]["order"][image_count], 300)
                         #sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
 
@@ -786,6 +790,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                         send_trigger(trigger_helper[f"answer_{answer['selected_answer'] + 1}"])  # Trigger according to selected answer
 
                         answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
+
                         screen.fill(background)
                         pygame.display.flip()
                         pygame.time.set_timer(phase_change, randint(800 - trigger_gap, 1000 - trigger_gap), loops=1) # The trigger_gap (ms) range will be left for trigger launches in the following section.
@@ -848,6 +853,8 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                         else:
                             draw_cross((200, 0, 0), center, 120)
 
+                        send_trigger(trigger_helper["feedback_trigger"])  # Feedback trigger after all other triggers to maintain consistent timing of feedback presentation in relation to triggers
+                        
                         pygame.display.flip()
                         pygame.time.set_timer(phase_change, 1500, loops=1)
                         actual_phase = 1
