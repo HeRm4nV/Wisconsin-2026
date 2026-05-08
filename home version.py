@@ -666,6 +666,8 @@ def show_image_trial(image, scale):
         base_center = [int(resolution[0] / 8 + count * (resolution[0] / 4)), int(resolution[1] / 8)*2]
         screen.blit(base_image_scaled, [base_center[0] - base_image_scaled.get_size()[0]/2, base_center[1] - base_image_scaled.get_size()[1]/2])
 
+    send_trigger(trigger_helper["stimulus_onset"])  # Stimulus onset trigger after all other triggers to maintain consistent timing of stimulus presentation in relation to triggers
+
     screen.blit(picture, [x - picture.get_size()[count]/2 for count, x in enumerate(center)])
     pygame.display.flip()
 
@@ -780,8 +782,6 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
 
                         pygame.time.wait(max(0, trigger_gap - triggers_load))  # Adjust wait time to maintain consistent latency
 
-                        send_trigger(trigger_helper["stimulus_onset"])  # Stimulus onset trigger after all other triggers to maintain consistent timing of stimulus presentation in relation to triggers
-
                         show_image_trial(image_list[serie_count]["order"][image_count], 300)
                         #sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
 
@@ -854,7 +854,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                             draw_cross((200, 0, 0), center, 120)
 
                         send_trigger(trigger_helper["feedback_trigger"])  # Feedback trigger after all other triggers to maintain consistent timing of feedback presentation in relation to triggers
-                        
+
                         pygame.display.flip()
                         pygame.time.set_timer(phase_change, 1500, loops=1)
                         actual_phase = 1
