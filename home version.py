@@ -1275,9 +1275,10 @@ def main():
             paragraph(select_slide('break', variables={"blockNumber": block_number, "practice": False, "trial_types": trial_types}), key = K_SPACE, no_foot = False)
 
     paragraph(select_slide('farewell'), key = K_SPACE, no_foot = True)
-    close_com()
 
     send_trigger(trigger_helper["end_experiment"])
+    close_com()
+
     ends()
 
 if __name__ == "__main__":
