@@ -63,10 +63,6 @@ trigger_gap = 100 # total of triggers gap between sections
 individual_trigger_gap = 10 # gap between triggers within the same section, used to adjust timing of trigger sending
 
 # Triggers
-trigger_latency = 5
-start_trigger = 254
-stop_trigger = 255
-
 trigger_helper = {
     "fixation": 70,
     "stimulus_onset": 80,
@@ -680,7 +676,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
     serie_count = 0
 
     if not trial_block:
-        send_trigger(trigger_helper[f"block_{block}_start"])
+        sleepy_trigger(trigger_helper[f"block_{block}_start"], 20)
 
     send_trigger(trigger_helper["fixation"])
     screen.fill(background)
@@ -1249,7 +1245,7 @@ def main():
         else:
             break
 
-    csv_name = date_name + '_' + subj_name + '.csv'
+    csv_name = subj_name + '_' + date_name + '.csv'
     dfile = open(DATA_DIR/csv_name, 'w')
     dfile.write("%s,%s,%s,%s,%s,%s,%s\n" % ("Sujeto", "IdImagen", "Bloque", "TReaccion", "TipoSerie", "Respuesta", "Acierto"))
     dfile.flush()
@@ -1259,7 +1255,7 @@ def main():
     # Block series stacks generation and debug files
     block_stacks = block_creation()
 
-    send_trigger(start_trigger)
+    send_trigger(trigger_helper["start_experiment"])
 
     paragraph(select_slide('instructions'), key = K_SPACE, no_foot = False)
     paragraph(select_slide('pretrial'), key = K_SPACE, no_foot = False)
@@ -1280,8 +1276,9 @@ def main():
 
     paragraph(select_slide('farewell'), key = K_SPACE, no_foot = True)
     close_com()
-    ends()
 
+    send_trigger(trigger_helper["end_experiment"])
+    ends()
 
 if __name__ == "__main__":
     main()
