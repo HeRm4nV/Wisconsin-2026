@@ -59,8 +59,8 @@ test_name = "Wisconsin Task"
 date_name = strftime("%Y-%m-%d_%H-%M-%S", gmtime())
 
 # Trigger balancing parameters
-trigger_gap = 100 # total of triggers gap between sections
-individual_trigger_gap = 10 # gap between triggers within the same section, used to adjust timing of trigger sending
+trigger_gap = 250 # total of triggers gap between sections
+individual_trigger_gap = 30 # gap between triggers within the same section, used to adjust timing of trigger sending
 
 # Triggers
 trigger_helper = {
@@ -349,8 +349,10 @@ def send_trigger(trigger):
         print(f'Failed to send trigger {trigger}')
 
 def sleepy_trigger(trigger, latency=100):
+    if debug:
+        print(f"[DEBUG] Creating trigger {trigger} with latency {latency} ms")
     send_trigger(trigger)
-    pygame.time.wait(latency)
+    pygame.time.delay(latency)
 
 def close_com():
     """Closes the serial port."""
@@ -754,29 +756,29 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                         card_number = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[0]
                         
                         if not first_stimulus_trigger_sent:
-                            sleepy_trigger(trigger_helper["first_stimulus_per_serie"], 10)
-                            sleepy_trigger(trigger_helper[f"actual_rule_{series_types[serie_count]}"], 10)
+                            sleepy_trigger(trigger_helper["first_stimulus_per_serie"], individual_trigger_gap)
+                            sleepy_trigger(trigger_helper[f"actual_rule_{series_types[serie_count]}"], individual_trigger_gap)
                             
-                            triggers_load += 20
+                            triggers_load += 2*individual_trigger_gap
 
                             first_stimulus_trigger_sent = True
 
                         if last_feedback is not None:
-                            sleepy_trigger(trigger_helper[last_feedback], 10)
-                            triggers_load += 10
+                            sleepy_trigger(trigger_helper[last_feedback], individual_trigger_gap)
+                            triggers_load += individual_trigger_gap
                             last_feedback = None
 
                         if last_image:
-                            sleepy_trigger(trigger_helper["last_target_card"], 10)
-                            triggers_load += 10
+                            sleepy_trigger(trigger_helper["last_target_card"], individual_trigger_gap)
+                            triggers_load += individual_trigger_gap
 
-                        sleepy_trigger(trigger_helper[f"{card_color}_card"], 10)
-                        sleepy_trigger(trigger_helper[f"{card_figure}_card"], 10)
-                        sleepy_trigger(trigger_helper[f"number_{card_number}_card"], 10)
+                        sleepy_trigger(trigger_helper[f"{card_color}_card"], individual_trigger_gap)
+                        sleepy_trigger(trigger_helper[f"{card_figure}_card"], individual_trigger_gap)
+                        sleepy_trigger(trigger_helper[f"number_{card_number}_card"], individual_trigger_gap)
 
-                        triggers_load += 30
+                        triggers_load += 3*individual_trigger_gap
 
-                        pygame.time.wait(max(0, trigger_gap - triggers_load))  # Adjust wait time to maintain consistent latency
+                        pygame.time.delay(max(0, trigger_gap - triggers_load))  # Adjust wait time to maintain consistent latency
 
                         show_image_trial(image_list[serie_count]["order"][image_count], 300)
                         #sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
@@ -840,7 +842,7 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                         else:
                             last_image = False
                         
-                        pygame.time.wait(max(0, trigger_gap - triggers_load))  # Adjust wait time to maintain consistent latency
+                        pygame.time.delay(max(0, trigger_gap - triggers_load))  # Adjust wait time to maintain consistent latency
                         
                         screen.fill(background)
                         
@@ -849,10 +851,11 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                         else:
                             draw_cross((200, 0, 0), center, 120)
 
-                        send_trigger(trigger_helper["feedback_trigger"])  # Feedback trigger after all other triggers to maintain consistent timing of feedback presentation in relation to triggers
-
                         pygame.display.flip()
-                        pygame.time.set_timer(phase_change, 1500, loops=1)
+
+                        sleepy_trigger(trigger_helper["feedback_trigger"], individual_trigger_gap)  # Feedback trigger after all other triggers to maintain consistent timing of feedback presentation in relation to triggers
+
+                        pygame.time.set_timer(phase_change, 1500 - individual_trigger_gap, loops=1)
                         actual_phase = 1
                     
     pygame.time.set_timer(phase_change, 0)
@@ -1275,8 +1278,8 @@ def main():
             paragraph(select_slide('break', variables={"blockNumber": block_number, "practice": False, "trial_types": trial_types}), key = K_SPACE, no_foot = False)
 
     paragraph(select_slide('farewell'), key = K_SPACE, no_foot = True)
+    sleepy_trigger(trigger_helper["end_experiment"], individual_trigger_gap)
 
-    send_trigger(trigger_helper["end_experiment"])
     close_com()
 
     ends()
