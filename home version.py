@@ -1248,7 +1248,7 @@ def main():
         else:
             break
 
-    csv_name = subj_name + '_' + date_name + '.csv'
+    csv_name = subj_name + '_Wisconsin_' + date_name + '.csv'
     dfile = open(DATA_DIR/csv_name, 'w')
     dfile.write("%s,%s,%s,%s,%s,%s,%s\n" % ("Sujeto", "IdImagen", "Bloque", "TReaccion", "TipoSerie", "Respuesta", "Acierto"))
     dfile.flush()
