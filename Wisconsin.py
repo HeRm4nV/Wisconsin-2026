@@ -1248,7 +1248,16 @@ def main():
         else:
             break
 
-    csv_name = subj_name + '_Wisconsin_' + date_name + '.csv'
+    print("Ingrese el número correspondiente a la condición del participante y presione ENTER para iniciar:")
+    print("1. Registro previo a dosificación")
+    print("2. Registro posterior a dosificación")
+
+    condition_input = input("Ingrese el número de la condición (1 o 2): ")
+    while condition_input not in ["1", "2"]:
+        print("Número de condición inválido. Por favor, ingrese 1 o 2.")
+        condition_input = input("Ingrese el número de la condición (1 o 2): ")
+
+    csv_name = subj_name + ("_pre" if condition_input == 1 else "post") + '_Wisconsin_' + date_name + '.csv'
     dfile = open(DATA_DIR/csv_name, 'w')
     dfile.write("%s,%s,%s,%s,%s,%s,%s\n" % ("Sujeto", "IdImagen", "Bloque", "TReaccion", "TipoSerie", "Respuesta", "Acierto"))
     dfile.flush()
