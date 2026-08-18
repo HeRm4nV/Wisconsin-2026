@@ -639,7 +639,7 @@ def wait_answer(image, series_type):
             'is_correct': is_correct,
             'rt': rt,}
 
-def show_image_trial(image, scale):
+def show_image_trial(image, scale, trial_block=False):
     global base_images_loaded, base_images_list
     screen.fill(background)
     try:
@@ -664,7 +664,8 @@ def show_image_trial(image, scale):
         base_center = [int(resolution[0] / 8 + count * (resolution[0] / 4)), int(resolution[1] / 8)*2]
         screen.blit(base_image_scaled, [base_center[0] - base_image_scaled.get_size()[0]/2, base_center[1] - base_image_scaled.get_size()[1]/2])
 
-    send_trigger(trigger_helper["stimulus_onset"])  # Stimulus onset trigger after all other triggers to maintain consistent timing of stimulus presentation in relation to triggers
+    if not trial_block:
+        send_trigger(trigger_helper["stimulus_onset"])  # Stimulus onset trigger after all other triggers to maintain consistent timing of stimulus presentation in relation to triggers
 
     screen.blit(picture, [x - picture.get_size()[count]/2 for count, x in enumerate(center)])
     pygame.display.flip()
@@ -679,8 +680,8 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
 
     if not trial_block:
         sleepy_trigger(trigger_helper[f"block_{block}_start"], 20)
+        send_trigger(trigger_helper["fixation"])
 
-    send_trigger(trigger_helper["fixation"])
     screen.fill(background)
     screen.blit(fix, fixbox)
     pygame.display.update(fixbox)
@@ -724,7 +725,8 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
 
                 elif event.type == phase_change:
                     if actual_phase == 1: # Fixation Phase
-                        send_trigger(trigger_helper["fixation"])
+                        if not trial_block:
+                            send_trigger(trigger_helper["fixation"])
                         screen.fill(background)
                         screen.blit(fix, fixbox)
                         pygame.display.update(fixbox)
@@ -756,36 +758,41 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
                         card_number = image_list[serie_count]["order"][image_count].parts[-1].split('.')[0].split('_')[0]
                         
                         if not first_stimulus_trigger_sent:
-                            sleepy_trigger(trigger_helper["first_stimulus_per_serie"], individual_trigger_gap)
-                            sleepy_trigger(trigger_helper[f"actual_rule_{series_types[serie_count]}"], individual_trigger_gap)
+                            if not trial_block:
+                                sleepy_trigger(trigger_helper["first_stimulus_per_serie"], individual_trigger_gap)
+                                sleepy_trigger(trigger_helper[f"actual_rule_{series_types[serie_count]}"], individual_trigger_gap)
                             
                             triggers_load += 2*individual_trigger_gap
 
                             first_stimulus_trigger_sent = True
 
                         if last_feedback is not None:
-                            sleepy_trigger(trigger_helper[last_feedback], individual_trigger_gap)
+                            if not trial_block:
+                                sleepy_trigger(trigger_helper[last_feedback], individual_trigger_gap)
                             triggers_load += individual_trigger_gap
                             last_feedback = None
 
                         if last_image:
-                            sleepy_trigger(trigger_helper["last_target_card"], individual_trigger_gap)
+                            if not trial_block:
+                                sleepy_trigger(trigger_helper["last_target_card"], individual_trigger_gap)
                             triggers_load += individual_trigger_gap
 
-                        sleepy_trigger(trigger_helper[f"{card_color}_card"], individual_trigger_gap)
-                        sleepy_trigger(trigger_helper[f"{card_figure}_card"], individual_trigger_gap)
-                        sleepy_trigger(trigger_helper[f"number_{card_number}_card"], individual_trigger_gap)
+                        if not trial_block:
+                            sleepy_trigger(trigger_helper[f"{card_color}_card"], individual_trigger_gap)
+                            sleepy_trigger(trigger_helper[f"{card_figure}_card"], individual_trigger_gap)
+                            sleepy_trigger(trigger_helper[f"number_{card_number}_card"], individual_trigger_gap)
 
                         triggers_load += 3*individual_trigger_gap
 
                         pygame.time.delay(max(0, trigger_gap - triggers_load))  # Adjust wait time to maintain consistent latency
 
-                        show_image_trial(image_list[serie_count]["order"][image_count], 300)
+                        show_image_trial(image_list[serie_count]["order"][image_count], 300, trial_block=trial_block)
                         #sleepy_trigger(trigger_helper["1"], trigger_latency)  # Exposure image trigger first
 
                         answer = wait_answer(image_list[serie_count]["order"][image_count], series_types[serie_count])
 
-                        send_trigger(trigger_helper[f"answer_{answer['selected_answer'] + 1}"])  # Trigger according to selected answer
+                        if not trial_block:
+                            send_trigger(trigger_helper[f"answer_{answer['selected_answer'] + 1}"])  # Trigger according to selected answer
 
                         answers_list.append([image_list[serie_count]["order"][image_count], answer, series_types[serie_count]])
 
@@ -799,40 +806,45 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
 
                         # Trigger launch based on the response
                         if answer['is_correct']:
-                            sleepy_trigger(trigger_helper["correct_response"], individual_trigger_gap)
+                            if not trial_block:
+                                sleepy_trigger(trigger_helper["correct_response"], individual_trigger_gap)
                             triggers_load += individual_trigger_gap
 
                             corrects_in_series += 1
 
-                            if corrects_in_series == 1:
-                                sleepy_trigger(trigger_helper["first_correct"], individual_trigger_gap)
-                            elif corrects_in_series == 2:
-                                sleepy_trigger(trigger_helper["second_correct"], individual_trigger_gap)
-                            else:
-                                sleepy_trigger(trigger_helper["other_correct"], individual_trigger_gap)
+                            if not trial_block:
+                                if corrects_in_series == 1:
+                                    sleepy_trigger(trigger_helper["first_correct"], individual_trigger_gap)
+                                elif corrects_in_series == 2:
+                                    sleepy_trigger(trigger_helper["second_correct"], individual_trigger_gap)
+                                else:
+                                    sleepy_trigger(trigger_helper["other_correct"], individual_trigger_gap)
                             
                             triggers_load += individual_trigger_gap * 3
 
                             last_answer_correct = True
 
                         else:
-                            sleepy_trigger(trigger_helper["incorrect_response"], individual_trigger_gap)
+                            if not trial_block: 
+                                sleepy_trigger(trigger_helper["incorrect_response"], individual_trigger_gap)
 
                             triggers_load += individual_trigger_gap
 
                             incorrects_in_series += 1
 
-                            if incorrects_in_series == 1:
-                                sleepy_trigger(trigger_helper["first_error"], individual_trigger_gap)
-                            elif incorrects_in_series == 2:
-                                sleepy_trigger(trigger_helper["second_error"], individual_trigger_gap)
-                            else:
-                                sleepy_trigger(trigger_helper["other_error"], individual_trigger_gap)
+                            if not trial_block:
+                                if incorrects_in_series == 1:
+                                    sleepy_trigger(trigger_helper["first_error"], individual_trigger_gap)
+                                elif incorrects_in_series == 2:
+                                    sleepy_trigger(trigger_helper["second_error"], individual_trigger_gap)
+                                else:
+                                    sleepy_trigger(trigger_helper["other_error"], individual_trigger_gap)
 
                             triggers_load += individual_trigger_gap
 
                             if last_answer_correct is not None and not last_answer_correct:
-                                sleepy_trigger(trigger_helper["error_between_correct"], individual_trigger_gap)
+                                if not trial_block:
+                                    sleepy_trigger(trigger_helper["error_between_correct"], individual_trigger_gap)
                                 triggers_load += individual_trigger_gap
 
                             last_answer_correct = False
@@ -853,7 +865,8 @@ def show_images(image_list, uid=None, dfile=None, block=None, series_types=None,
 
                         pygame.display.flip()
 
-                        sleepy_trigger(trigger_helper["feedback_trigger"], individual_trigger_gap)  # Feedback trigger after all other triggers to maintain consistent timing of feedback presentation in relation to triggers
+                        if not trial_block:
+                            sleepy_trigger(trigger_helper["feedback_trigger"], individual_trigger_gap)  # Feedback trigger after all other triggers to maintain consistent timing of feedback presentation in relation to triggers
 
                         pygame.time.set_timer(phase_change, 1500 - individual_trigger_gap, loops=1)
                         actual_phase = 1
@@ -1267,8 +1280,6 @@ def main():
     # Block series stacks generation and debug files
     block_stacks = block_creation()
 
-    send_trigger(trigger_helper["start_experiment"])
-
     paragraph(select_slide('instructions'), key = K_SPACE, no_foot = False)
     paragraph(select_slide('pretrial'), key = K_SPACE, no_foot = False)
 
@@ -1276,6 +1287,8 @@ def main():
     show_images(trial_block_series, uid=subj_name, dfile=None, block=0, series_types=[serie["serie_type"] for serie in trial_block_series], trial_block=True)
 
     paragraph(select_slide('posttrial', variables={"blockNumber": 0, "practice": True, "trial_types": trial_types}), key = K_SPACE, no_foot = False)
+
+    send_trigger(trigger_helper["start_experiment"])
 
     for block_number, block in enumerate(block_stacks):
         series_types = generate_series_types_for_block()
