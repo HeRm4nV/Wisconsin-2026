@@ -54,6 +54,9 @@ DATA_DIR = BASE_DIR / "data"
 DEBUG_DIR = BASE_DIR / "debug_data"
 DEBUG_DIR.mkdir(exist_ok=True)
 
+# Puerto de comunicación para triggers (ajustar según el sistema)
+serial_port = "COM5"  # Cambiar según el puerto de comunicación del sistema
+
 FullScreenShow = True  # Automatically start in fullscreen mode
 test_name = "Wisconsin Task"
 date_name = strftime("%Y-%m-%d_%H-%M-%S", gmtime())
@@ -1233,7 +1236,7 @@ def create_debug_zip(debug_base_dir, zip_name):
 
 def main():
 
-    init_com()
+    init_com(address=serial_port)
 
     # Si no existe la carpeta data se crea
     if not os.path.exists(DATA_DIR):
