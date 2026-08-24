@@ -1273,7 +1273,7 @@ def main():
         print("Número de condición inválido. Por favor, ingrese 1 o 2.")
         condition_input = input("Ingrese el número de la condición (1 o 2): ")
 
-    csv_name = subj_name + ("_pre" if condition_input == 1 else "post") + '_Wisconsin_' + date_name + '.csv'
+    csv_name = subj_name + ("_pre" if condition_input == "1" else "_post") + '_Wisconsin_' + date_name + '.csv'
     dfile = open(DATA_DIR/csv_name, 'w')
     dfile.write("%s,%s,%s,%s,%s,%s,%s\n" % ("Sujeto", "IdImagen", "Bloque", "TReaccion", "TipoSerie", "Respuesta", "Acierto"))
     dfile.flush()
