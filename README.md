@@ -7,10 +7,10 @@ Este experimento implementa una versión adaptada del **Wisconsin Card Sorting T
 ## Información del Experimento
 
 - **Nombre**: Wisconsin Task
-- **Versión**: 1.1
+- **Versión**: 1.1.0
 - **Python Version**: 3.11
 - **Autor**: Herman Valencia
-- **Estado**: ✅ Funcional | ✅ Sistema de Triggers Actualizado
+- **Estado**: ✅ Versión estable | ✅ Sistema de Triggers Actualizado
 
 ---
 
@@ -18,26 +18,21 @@ Este experimento implementa una versión adaptada del **Wisconsin Card Sorting T
 
 ### Configuración de Bloques
 
-El experimento consta de **4 bloques** con las siguientes características:
+El experimento consta de **4 bloques**. En la versión estable 1.1.0, la distribución de mazos se calcula dinámicamente a partir del tamaño real del mazo (`DECK_SIZE`) y de los ensayos requeridos por bloque.
 
-| Bloque | Distribución de Mazos | Total de Ensayos |
-|--------|----------------------|------------------|
-| 1      | 60 + 45              | 105              |
-| 2      | 15 + 60 + 30         | 105              |
-| 3      | 30 + 60 + 15         | 105              |
-| 4      | 45 + 60              | 105              |
+Cada bloque contiene **108 ensayos** y la continuidad de los mazos se mantiene entre bloques. Por lo tanto, los tamaños concretos de los cortes de mazo pueden variar según dónde haya quedado el mazo anterior.
 
-**Total del experimento**: 420 ensayos (4 bloques × 105 ensayos)
+**Total del experimento**: 432 ensayos (4 bloques × 108 ensayos)
 
 ### Estructura de Series
 
-Cada bloque contiene **15 series** con la siguiente distribución:
+Cada bloque contiene **18 series** con la siguiente distribución:
 
-- **5 series de 6 ensayos** (30 ensayos)
-- **5 series de 7 ensayos** (35 ensayos)
-- **5 series de 8 ensayos** (40 ensayos)
+- **6 series de 5 ensayos** (30 ensayos)
+- **6 series de 6 ensayos** (36 ensayos)
+- **6 series de 7 ensayos** (42 ensayos)
 
-**Total por bloque**: 105 ensayos
+**Total por bloque**: 108 ensayos
 
 > **Nota**: El orden de las series se aleatoriza en cada bloque para evitar efectos de orden.
 
@@ -55,7 +50,7 @@ El experimento utiliza **3 reglas de clasificación** que se presentan en orden 
 
 ### Distribución de Reglas
 
-- Cada bloque tiene **15 series** (5 iteraciones de las 3 reglas)
+- Cada bloque tiene **18 series** (6 iteraciones de las 3 reglas)
 - En cada iteración, las 3 reglas se aleatorizan
 - **Restricción importante**: La primera regla de una nueva iteración nunca puede ser igual a la última regla de la iteración anterior
 - Esto asegura cambios de regla claros entre series consecutivas
@@ -78,14 +73,14 @@ El experimento utiliza **4 cartas de referencia estáticas** ubicadas en la part
 El experimento utiliza tres categorías de estímulos visuales:
 
 ### 1. Singles (Cartas Individuales)
-- **Cantidad**: 24 cartas únicas
+- **Cantidad disponible**: 24 cartas únicas
 - **Ubicación**: `media/images/Single/`
-- **Uso**: Cada serie comienza con **2 cartas singles obligatorias**
+- **Uso en la versión estable**: Cada serie comienza con **3 cartas singles obligatorias**, salvo los casos límite en los que el corte de mazo no dispone de suficientes slots.
 
 ### 2. Doubles (Cartas Dobles)
-- **Cantidad**: 36 cartas únicas
+- **Cantidad disponible**: 36 cartas únicas
 - **Ubicación**: `media/images/Double/`
-- **Uso**: Se mezclan con las singles después de las 2 obligatorias
+- **Uso en la versión estable**: Se utilizan junto con las singles para completar cada serie.
 
 ### 3. Static (Cartas de Referencia)
 - **Cantidad**: 4 cartas fijas
@@ -113,35 +108,41 @@ Las imágenes deben seguir el formato:
 El experimento implementa un sistema sofisticado de distribución basado en **DeckCursor**:
 
 ### 1. Proporción Mantenida
-- Las cartas singles y doubles mantienen su proporción original (24:36 ≈ 40:60)
-- Esta proporción se respeta en todos los mazos del experimento
+- La versión estable utiliza **24 singles + 24 doubles por mazo completo**, para una proporción **1:1 (50:50)**.
+- `MAX_TYPE_A = 24` limita las singles disponibles por mazo.
+- `MAX_TYPE_B = 36` define el máximo disponible de doubles, aunque la configuración estable limita cada mazo a 24 doubles mediante el cálculo proporcional.
+- La configuración anterior 24:36 (40:60) se conserva únicamente en la rama `first_version=True`.
 
 ### 2. Sistema de Mazos Múltiples
-- Cada bloque puede tener múltiples mazos (según `deck_sizes_per_block`)
-- Los mazos se consumen secuencialmente a través de las series
-- **Planificación automática**: El sistema calcula qué series consume cada mazo
+- El tamaño efectivo del mazo se calcula automáticamente mediante `PERCENTAGE`, `MAX_TYPE_A` y `MAX_TYPE_B`.
+- En la versión estable (`first_version=False`), `DECK_SIZE` resulta en **48 cartas**.
+- Los bloques no utilizan una lista fija de tamaños: `block_creation()` calcula dinámicamente los cortes necesarios para completar los ensayos de cada bloque.
+- Los mazos se consumen secuencialmente a través de las series y la posición restante de un mazo puede continuar en el bloque siguiente.
 
 ### 3. Inicialización de Series
 
 Para cada serie:
 
-1. **Reserva proporcional**: Se calculan cuántas singles y doubles se necesitan del mazo actual
-2. **Singles obligatorias**: Se añaden 2 cartas singles al inicio de cada serie nueva
-3. **Mezcla balanceada**: Las singles y doubles restantes se mezclan aleatoriamente
-4. **Relleno de series**: Se completa cada serie hasta su tamaño objetivo
+1. **Reserva proporcional**: Se calculan cuántas singles y doubles se necesitan del mazo actual.
+2. **Singles obligatorias**: Se intentan añadir **3 cartas singles** al inicio de cada serie nueva.
+3. **Manejo de casos límite**: Si el último corte no dispone de suficientes slots, se añaden únicamente las singles que caben sin sobrellenar la serie.
+4. **Mezcla balanceada**: Las singles y doubles restantes se mezclan aleatoriamente.
+5. **Relleno de series**: Se completa cada serie hasta su tamaño objetivo.
 
 ### 4. Reutilización de Cartas
 
-- Las cartas **no utilizadas** en un mazo se transfieren automáticamente al siguiente
-- Esto permite distribución eficiente a través de múltiples mazos por bloque
-- Se mantiene la proporción 40:60 en cada transferencia
+- Las cartas **no utilizadas** en un mazo se transfieren automáticamente al siguiente.
+- Los restos se mantienen mediante `DeckCursor` y se utilizan antes de crear un nuevo mazo.
+- Cuando se crea un nuevo mazo, se vuelven a mezclar las listas de singles y doubles y se seleccionan las cantidades calculadas para el mazo.
 
 ### 5. Validación Automática
 
 El sistema valida que:
-- Cada bloque tenga exactamente 105 ensayos
-- No haya series vacías
-- Todas las cartas obligatorias estén presentes
+- Cada bloque tenga exactamente `TRIALS_PER_BLOCK` ensayos.
+- `TRIALS_PER_BLOCK` se calcula a partir de `SERIES_DISTRIBUTION` y actualmente es **108**.
+- No haya series vacías.
+- Las series alcancen su tamaño objetivo.
+- Las cartas obligatorias disponibles no sean insuficientes.
 
 ---
 
@@ -252,14 +253,15 @@ Muchas gracias por su colaboración!!
 
 ### Configuración del Sistema
 
-El sistema de triggers está implementado y soporta tanto puerto paralelo (LPT) como puerto serial (COM).
+El sistema de triggers de la versión estable está implementado mediante **puerto serial (COM)**.
 
-**Parámetros en el código**:
+**Parámetros principales en el código**:
 ```python
-lpt_address = 0xD100       # Dirección del puerto paralelo
-trigger_latency = 5        # Latencia en milisegundos
-start_trigger = 254        # Trigger de inicio
-stop_trigger = 255         # Trigger de fin
+serial_port = "COM5"          # Puerto COM utilizado por main()
+trigger_gap = 250             # Tiempo reservado entre secciones de triggers (ms)
+individual_trigger_gap = 30   # Separación entre triggers de una misma sección (ms)
+start_trigger = 254           # Trigger de inicio
+stop_trigger = 255             # Trigger de fin
 ```
 
 ### Tabla Completa de Triggers
@@ -271,6 +273,8 @@ stop_trigger = 255         # Trigger de fin
 | `254` | `start_experiment` | Inicio del experimento | Al comenzar la sesión |
 | `255` | `end_experiment` | Fin del experimento | Al finalizar la sesión |
 | `70` | `fixation` | Cruz de fijación | Antes de cada ensayo |
+| `80` | `stimulus_onset` | Inicio de presentación del estímulo | Inmediatamente antes de mostrar la carta objetivo |
+| `90` | `feedback_trigger` | Inicio del feedback visual | Después de mostrar el feedback de la respuesta |
 
 #### Triggers de Bloques
 
@@ -382,9 +386,11 @@ stop_trigger = 255         # Trigger de fin
 4. [33]  → green_card (carta verde)
 5. [41]  → star_card (carta con estrellas)
 6. [52]  → number_2_card (carta con 2 elementos)
-7. [22]  → answer_2 (usuario presiona V)
-8. [121] → correct_response (respuesta correcta)
-9. [141] → first_correct (primera correcta de la serie)
+7. [80]  → stimulus_onset (inicio de presentación)
+8. [22]  → answer_2 (usuario presiona V)
+9. [121] → correct_response (respuesta correcta)
+10. [141] → first_correct (primera correcta de la serie)
+11. [90] → feedback_trigger (inicio del feedback visual)
 ```
 
 **Ejemplo: Último ensayo de una serie (respuesta correcta)**
@@ -395,34 +401,19 @@ stop_trigger = 255         # Trigger de fin
 3. [32]  → red_card
 4. [42]  → triangle_card
 5. [51]  → number_1_card
-6. [21]  → answer_1
-7. [121] → correct_response
-8. [181] → other_correct (tercera o más correcta)
-9. [230] → last_feedback_181 (feedback final de serie)
+6. [80]  → stimulus_onset
+7. [21]  → answer_1
+8. [121] → correct_response
+9. [181] → other_correct (tercera o más correcta)
+10. [230] → last_feedback_181 (feedback final de serie)
+11. [90] → feedback_trigger
 ```
 
 ### Integración Hardware
 
-#### Puerto Paralelo (LPT)
-
-```python
-init_lpt(address=0xD100)
-send_trigger(trigger, address, latency=5)
-```
-
-**Requisitos**:
-- Sistema operativo Windows
-- Archivo [`dlportio.dll`](https://real.kiev.ua/avreal/download/) instalado
-- Permisos de administrador
-
-**Instalación de dlportio.dll**:
-1. Descargar desde el enlace oficial
-2. Copiar a:
-   - `C:\Windows\System32\` (Windows 64-bit)
-   - `C:\Windows\SysWOW64\` (Windows 32-bit)
-3. Ejecutar el programa como Administrador
-
 #### Puerto Serial (COM)
+
+La versión estable utiliza la interfaz serial mediante `pyserial`.
 
 ```python
 init_com(address="COM3")
@@ -433,7 +424,10 @@ close_com()
 **Configuración**:
 - **Baudrate**: 115200
 - **Formato**: 1 byte por trigger
-- **Puerto por defecto**: COM3
+- **Puerto por defecto de `init_com()`**: COM3
+- **Puerto utilizado por `main()`**: COM5, definido en `serial_port`
+
+> **Nota**: La versión estable actual no implementa una función `init_lpt()` ni `send_trigger_lpt()`. El código fuente contiene únicamente la implementación de triggers por puerto serial.
 
 **Verificar puertos disponibles**:
 ```python
@@ -455,7 +449,7 @@ Esta función envía un trigger y espera la latencia especificada antes de conti
 
 Para verificar que los triggers se envían correctamente:
 
-1. **Activar modo debug**: `debug = True` en [`home version.py`](home%20version.py)
+1. **Activar modo debug**: `debug = True` en `Wisconsin.py`
 2. Los mensajes de consola mostrarán cada trigger enviado:
    ```
    Trigger 70 sent
@@ -511,38 +505,41 @@ Estructura del bloque 1
 Serie 1: Tamaño 7
 Serie 2: Tamaño 6
 ...
-Serie 15: Tamaño 8
+Serie 18: Tamaño 7
 
 Distribución de mazos:
-  Mazo 1 (tamaño 60): series 1 a 9
+  Mazo 1 (tamaño variable): series 1 a ...
     Serie 1: usa 7 slots
     Serie 2: usa 6 slots
     ...
-  Mazo 2 (tamaño 45): series 9 a 15
+  Mazo 2 (tamaño variable): continuación según el corte calculado
     ...
 ```
 
-#### 2. Archivo de Datos Experimentales (En Desarrollo)
+#### 2. Archivo de Datos Experimentales
 
-**Formato CSV planeado** con las siguientes columnas:
+La versión estable genera un archivo CSV por sesión con las siguientes columnas:
 
 | Campo | Descripción |
 |-------|-------------|
 | `Sujeto` | ID del participante |
 | `IdImagen` | Nombre del archivo de la carta |
 | `Bloque` | Número de bloque (1-4) |
-| `Serie` | Número de serie dentro del bloque (1-15) |
-| `Ensayo` | Número de ensayo dentro de la serie |
-| `TipoRegla` | Regla activa (number/color/figure) |
 | `TReaccion` | Tiempo de reacción en ms |
-| `TipoImagen` | Single o Double |
-| `ColorCarta` | Color de la carta (red/green/yellow/blue) |
-| `FiguraCarta` | Figura de la carta (triangle/star/cross/circle) |
-| `NumeroCarta` | Número de elementos (1/2/3/4) |
-| `Respuesta` | Tecla presionada (0=C, 1=V, 2=B, 3=N) |
+| `TipoSerie` | Regla activa (number/color/figure) |
+| `Respuesta` | Índice de respuesta seleccionada (0=C, 1=V, 2=B, 3=N) |
 | `Acierto` | 1 si correcto, 0 si incorrecto |
-| `SecuenciaAciertos` | Contador de aciertos consecutivos |
-| `SecuenciaErrores` | Contador de errores consecutivos |
+
+El nombre del archivo sigue el formato:
+
+```text
+[ID]_pre_Wisconsin_YYYY-MM-DD_HH-MM-SS.csv
+[ID]_post_Wisconsin_YYYY-MM-DD_HH-MM-SS.csv
+```
+
+La condición se solicita al inicio de la sesión:
+- `1`: Registro previo a dosificación (`_pre`)
+- `2`: Registro posterior a dosificación (`_post`)
 
 ### Metadata de Sesión
 
@@ -639,19 +636,15 @@ ls media/images/Static/
 
 ### 4. Configurar Hardware EEG (Opcional)
 
-**Para Puerto Paralelo**:
-1. Instalar `dlportio.dll`
-2. Verificar dirección del puerto: `lpt_address = 0xD100`
-3. Ejecutar como Administrador
-
 **Para Puerto Serial**:
-1. Identificar puerto COM disponible
-2. Modificar en código si es necesario: `init_com(address="COM3")`
+1. Identificar el puerto COM disponible.
+2. Modificar `serial_port` en el código si es necesario.
+3. La función `main()` inicializa la conexión mediante `init_com(address=serial_port)`.
 
 ### 5. Ejecutar el Experimento
 
 ```bash
-python "home version.py"
+python "Wisconsin.py"
 ```
 
 ---
@@ -660,11 +653,13 @@ python "home version.py"
 
 ### Activación
 
-Modificar en [`home version.py`](home%20version.py):
+La versión estable ya inicia con:
 
 ```python
 debug = True
 ```
+
+Puede cambiarse a `False` en `Wisconsin.py` para ejecutar con salida mínima.
 
 ### Funcionalidades Habilitadas
 
@@ -703,23 +698,23 @@ debug = True
 ### Validaciones Automáticas
 
 1. **Cantidad de Ensayos**
-   - Cada bloque debe tener exactamente 105 ensayos
-   - Error si la suma de mazos ≠ 105
+   - Cada bloque debe tener exactamente 108 ensayos
+   - Error si la suma de mazos ≠ `TRIALS_PER_BLOCK`
 
 2. **Proporción Singles/Doubles**
-   - Se mantiene 40:60 en todos los mazos
-   - Validación en cada transferencia entre mazos
+   - La configuración estable utiliza 24 singles y 24 doubles por mazo completo
+   - Proporción efectiva 50:50
 
 3. **Series Completas**
    - Todas las series deben alcanzar su tamaño objetivo
    - No se permiten series incompletas
 
 4. **Singles Obligatorias**
-   - Cada serie comienza con 2 singles
-   - Error si no hay suficientes singles disponibles
+   - Cada serie intenta comenzar con 3 singles
+   - En cortes límite se utilizan solo las singles que caben sin sobrellenar
 
 5. **Reglas Balanceadas**
-   - 5 repeticiones de cada regla por bloque
+   - 6 repeticiones de cada regla por bloque
    - No repetición entre fin e inicio de iteraciones
 
 ### Verificación Manual
@@ -771,13 +766,11 @@ deck_sizes_per_block = [
 ]
 ```
 
-### Error: "Not enough Singles for mandatory 2 per series"
+### Error: "Not enough Singles for mandatory 3 per series"
 
-**Causa**: Proporción incorrecta entre singles y doubles
+**Causa**: No hay suficientes singles disponibles para completar las 3 singles obligatorias de una serie.
 
-**Solución**: Verificar que haya al menos:
-- **Singles**: 24 imágenes (mínimo: 30 para 15 series × 2)
-- **Doubles**: 36 imágenes
+**Solución**: Verificar que existan las 24 imágenes de `media/images/Single/` y que el estado del `DeckCursor` permita disponer de las singles necesarias.
 
 ### Error: "Parallel port could not be opened"
 
@@ -806,22 +799,23 @@ init_com(address="COM4")  # Usar puerto correcto
 
 ### Triggers No Se Envían
 
-**Causa**: Puerto no inicializado o configuración incorrecta
+**Causa**: Puerto serial no inicializado, puerto COM incorrecto o configuración incorrecta.
 
 **Solución**:
-1. Verificar que `init_lpt()` o `init_com()` se llamen al inicio
-2. Comprobar mensajes de consola: "Parallel/Serial port opened"
-3. Verificar latencia: `trigger_latency = 5`
-4. Probar con diferentes direcciones de puerto
+1. Verificar que `init_com(address=serial_port)` se ejecute al inicio.
+2. Comprobar el mensaje de consola: "Serial port opened".
+3. Verificar que `serial_port` corresponda al puerto COM utilizado por el sistema.
+4. Utilizar `serial.tools.list_ports` para comprobar los puertos disponibles.
 
 ### Triggers Duplicados o Perdidos
 
-**Causa**: Latencia insuficiente o problemas de sincronización
+**Causa**: Separación insuficiente entre triggers o problemas de sincronización.
 
 **Solución**:
-1. Aumentar `trigger_latency` a 10-20 ms
-2. Usar `sleepy_trigger()` en lugar de `send_trigger()` directo
-3. Verificar que el sistema EEG pueda procesar triggers rápidos
+1. Revisar `individual_trigger_gap` (30 ms por defecto).
+2. Revisar `trigger_gap` (250 ms por defecto).
+3. Usar `sleepy_trigger()` cuando se requiera una espera explícita después del envío.
+4. Verificar que el sistema EEG pueda procesar triggers rápidos.
 
 ---
 
@@ -833,9 +827,9 @@ init_com(address="COM4")  # Usar puerto correcto
 - Los tamaños de series se aleatorizan por bloque
 
 ### 2. Continuidad de Mazos
-- Las cartas sobrantes de un mazo se **reutilizan automáticamente** en el siguiente
-- Esto es transparente para el participante
-- Mantiene la proporción 40:60 en todo momento
+- Las cartas sobrantes de un mazo se **reutilizan automáticamente** en el siguiente.
+- La continuidad puede extenderse al siguiente bloque cuando el mazo actual no termina exactamente al final del bloque.
+- Los mazos nuevos se construyen con 24 singles y 24 doubles.
 
 ### 3. Reglas de Clasificación
 - **No se repite** la misma regla entre el final de una iteración y el inicio de la siguiente
@@ -848,15 +842,17 @@ init_com(address="COM4")  # Usar puerto correcto
 - Se recomienda responder lo más rápido posible
 
 ### 5. Archivos Debug
-- Los archivos ZIP se generan **automáticamente** en cada sesión si `debug=True`
-- **No se sobreescriben**: cada sesión tiene su propio timestamp
-- Útiles para validar la estructura del experimento antes de recopilar datos
+- Los archivos ZIP se generan **automáticamente** en cada sesión con `debug=True`.
+- La versión estable inicia con `debug=True`.
+- **No se sobreescriben**: cada sesión tiene su propio timestamp.
+- Además, `block_creation()` imprime la estructura generada cuando el modo debug está activo.
+- Son útiles para validar la estructura del experimento antes de recopilar datos.
 
 ### 6. Sistema de Triggers
-- Los triggers se envían de forma **síncrona** con los eventos visuales
-- La latencia de 5ms se usa por defecto (ajustable)
-- Todos los triggers importantes se documentan en la consola (modo debug)
-- El sistema soporta tanto puerto paralelo como serial
+- Los triggers se envían de forma **síncrona** con los eventos visuales.
+- `trigger_gap` se establece en 250 ms y `individual_trigger_gap` en 30 ms por defecto.
+- Todos los triggers importantes se documentan en la consola (modo debug).
+- La versión estable utiliza puerto serial (COM).
 
 ### 7. Nomenclatura de Archivos
 - **Crítico**: Los nombres de archivos deben seguir el formato exacto
@@ -866,31 +862,107 @@ init_com(address="COM4")  # Usar puerto correcto
 
 ---
 
-## Cambios en Versión 1.1
+## Cambios en Versión 1.1.0
 
 ### ✅ Nuevo en esta Versión
 
-1. Documentación y consolidación del sistema de triggers (códigos y ejemplos).
-2. Mejora de trazabilidad en modo debug: impresión de todos los triggers y detalle de bloques.
-3. Se documenta soporte LPT y COM, recomendaciones de latencia y uso de sleepy_trigger.
-4. Actualización de la versión del experimento en README a 1.1.
-5. Corrección en el manejo de series: la función initialize_series fue actualizada en el código para solucionar el caso límite en el que **solo queda una carta disponible para la última serie de un mazo** — ahora se añade únicamente 1 single cuando corresponde y se ajusta el contador interno para evitar sobrellenados o desbordes.
+La versión **1.1.0** reemplaza la configuración anterior y queda establecida como la versión que se utilizará de ahora en adelante.
 
-### 🚧 Notas detectadas / recomendaciones relacionadas con el código fuente
+1. **Nueva estructura de series**
+   - Se pasa de **15 a 18 series por bloque**.
+   - La distribución anterior de 6, 7 y 8 ensayos se reemplaza por:
+     - 6 series de 5 ensayos.
+     - 6 series de 6 ensayos.
+     - 6 series de 7 ensayos.
+   - Cada bloque pasa de **105 a 108 ensayos**.
+   - El experimento completo pasa de **420 a 432 ensayos**.
 
-- Implementación de triggers:
-  - En versiones previas había observaciones sobre duplicidad de funciones `send_trigger`. En la versión actual del código solo existe la implementación por serial (`init_com` / `send_trigger` por COM). Si se desea soporte LPT directo, se recomienda implementar una función dedicada `send_trigger_lpt(...)` o encapsular ambas implementaciones en un handler que seleccione la interfaz activa.
-- `EXPERIMENT_VERSION` en el código actualmente está definido como `"0.1"`. Si la versión del código debe corresponder a la versión del experimento (1.1), actualizar en `home version.py`:
-  ```python
-  EXPERIMENT_VERSION = "1.1"
-  ```
-- `create_debug_zip(debug_base_dir, zip_name)`:
-  - En la implementación actual `zip_path = debug_base_dir / zip_name` y en la llamada se pasa un Path absoluto para `zip_name` (`DEBUG_DIR / "debug_blocks_...zip"`). Revisar la firma y la construcción de la ruta para evitar crear rutas incorrectas; se sugiere usar: `zip_path = Path(zip_name)` si `zip_name` ya es absoluto, o pasar solo el nombre de archivo y construir la ruta con `DEBUG_DIR`.
-- `initialize_series`:
-  - Se actualizó para manejar el caso borde en que solo queda una imagen para la última serie del mazo (ver punto 5 en "Nuevo en esta Versión"). Mantener pruebas en modo debug para verificar comportamiento en mazos con divisiones que dejan 1 carta sobrante.
-- Revisar contadores y lógica de índices en `initialize_series` y `build_deck_plan` si se observan comportamientos anómalos en casos límite (p. ej. series al límite entre mazos).
+2. **Nueva configuración de mazos**
+   - La configuración estable utiliza `first_version = False`.
+   - Se definen `MAX_TYPE_A = 24` y `MAX_TYPE_B = 36` como límites de cartas disponibles.
+   - La proporción estable pasa a **1:1** mediante `PERCENTAGE = [1, 1]`.
+   - El tamaño efectivo de un mazo nuevo pasa a **48 cartas: 24 singles + 24 doubles**.
+   - La rama `first_version=True` se mantiene en el código como configuración usable, pero no es la seleccionada en la versión estable.
 
-Estas observaciones se añaden para mantener coherencia entre documentación y código. Corregir en el código solo si se desea cambiar el comportamiento actual.
+3. **Generación dinámica de cortes de mazo**
+   - `block_creation()` ya no depende de una lista fija de `deck_sizes_per_block`.
+   - Los cortes se calculan automáticamente a partir de `DECK_SIZE` y `TRIALS_PER_BLOCK`.
+   - La posición restante de un mazo se conserva entre cortes y puede continuar entre bloques.
+   - Esto permite que los bloques utilicen cortes variables sin modificar manualmente la estructura.
+
+4. **Aumento de singles obligatorias**
+   - `MANDATORY_SINGLES_PER_SERIES` establece **3 singles obligatorias por serie**.
+   - `initialize_series()` ahora utiliza este valor en lugar de tener el número 2 fijado directamente.
+   - Se amplió el manejo de casos límite del último corte para añadir solo las singles que caben sin sobrellenar la serie.
+
+5. **Mejora del control y depuración de mazos**
+   - Se imprime el estado de `DeckCursor` antes de cada corte cuando `debug=True`.
+   - Se muestra información adicional al iniciar cada mazo.
+   - Se imprime la estructura completa de `block_stacks` al finalizar `block_creation()` en modo debug.
+   - Se mantienen los archivos `debug_blocks_structure.txt` y `debug_block_X.txt` dentro del ZIP de depuración.
+
+6. **Generación de tipos de serie adaptable**
+   - `generate_series_types_for_block()` deja de asumir 15 series.
+   - Utiliza `SERIES_PER_BLOCK` para determinar cuántas series debe generar.
+   - Con la configuración estable, genera **18 reglas por bloque**, con **6 series de cada regla**.
+   - Se mantiene la restricción de que la primera regla de una nueva iteración no sea igual a la última de la iteración anterior.
+
+7. **Bloque de práctica adaptable**
+   - `trial_block_creation()` ya no utiliza exclusivamente el intervalo fijo 6-8.
+   - El tamaño de las series de práctica se obtiene mediante el mínimo y máximo de `SERIES_DISTRIBUTION`.
+   - Con la configuración estable, las series de práctica pueden tener entre **5 y 7 ensayos**.
+
+8. **Versión del experimento**
+   - `EXPERIMENT_VERSION` pasa de `"0.1"` a `"1.1.0"`.
+   - La documentación se actualiza para identificar **1.1.0** como la versión estable actual.
+
+9. **Modo debug por defecto**
+   - `debug` pasa de `False` a `True`.
+   - La ejecución estable proporciona información de depuración y genera los archivos de validación automáticamente.
+
+10. **Trazabilidad de triggers**
+    - Se mantiene el sistema de triggers existente.
+    - Se documentan explícitamente los triggers `80` (`stimulus_onset`) y `90` (`feedback_trigger`), utilizados para sincronizar la presentación del estímulo y del feedback.
+    - La secuencia documentada de triggers se actualiza para reflejar estos eventos.
+
+11. **Registro de datos**
+    - El CSV generado por la versión estable queda documentado según las **7 columnas que realmente escribe el código**.
+    - El nombre del archivo incorpora la condición `_pre` o `_post` y el timestamp de la sesión.
+
+### 🔄 Diferencias principales respecto a la versión anterior
+
+| Característica | Versión anterior | Versión estable 1.1.0 |
+|----------------|------------------|------------------------|
+| Series por bloque | 15 | 18 |
+| Distribución de series | 5×6, 5×7, 5×8 | 6×5, 6×6, 6×7 |
+| Ensayos por bloque | 105 | 108 |
+| Ensayos totales | 420 | 432 |
+| Proporción por mazo | 24 singles : 36 doubles (40:60) | 24 singles : 24 doubles (50:50) |
+| Tamaño de mazo nuevo | 60 | 48 |
+| Singles obligatorias | 2 | 3 |
+| Cortes de mazo | Definidos manualmente | Calculados dinámicamente |
+| Continuidad de mazos | Entre cortes del bloque | Entre cortes y, cuando corresponde, entre bloques |
+| Tipos de regla por bloque | 15 | 18 |
+| Repeticiones de cada regla | 5 | 6 |
+| Modo debug inicial | `False` | `True` |
+| Versión del código | `0.1` | `1.1.0` |
+
+### ⚠️ Configuración histórica conservada
+
+- `first_version = True` conserva la configuración anterior dentro del código:
+  - Series de 6, 7 y 8 ensayos.
+  - 15 series por bloque.
+  - 105 ensayos por bloque.
+  - Proporción 2:3.
+- **No modificar `first_version` a `True` para la ejecución estable**, ya que la configuración oficial de trabajo es `first_version = False`.
+
+### 🔧 Cambios de implementación relevantes
+
+- `block_creation()` ahora calcula `deck_sizes_per_block` internamente.
+- `initialize_series()` utiliza `MANDATORY_SINGLES_PER_SERIES` y maneja de forma general los casos límite del último corte.
+- `trial_block_creation()` obtiene los límites de tamaño desde `SERIES_DISTRIBUTION`.
+- `generate_series_types_for_block()` utiliza `SERIES_PER_BLOCK`.
+- `main()` conserva el flujo experimental, pero ahora puede mostrar la estructura completa de bloques en modo debug.
 
 ---
 
@@ -908,7 +980,6 @@ Estas observaciones se añaden para mantener coherencia entre documentación y c
 
 - **Pygame**: https://www.pygame.org/docs/
 - **PySerial**: https://pyserial.readthedocs.io/
-- **DLPortIO**: https://real.kiev.ua/avreal/download/
 
 ---
 
@@ -918,12 +989,12 @@ Para preguntas, reportar bugs o solicitar nuevas funcionalidades:
 
 - **Email**: herman.valencia.inf@gmail.com
 - **Issues**: https://github.com/HeRm4nV/Wisconsin-2026/issues
-- **Documentación**: Ver [`home version.py`](home%20version.py) para detalles de implementación
+- **Documentación**: Ver `Wisconsin.py` para detalles de implementación
 
 ---
 
-**Última actualización**: 21 de marzo de 2026  
-**Versión del documento**: 3.1  
-**Versión del código**: 1.1  
-**Versión del experimento**: 1.1  
-**Estado**: ✅ Funcional | ✅ Triggers documentados y actualizados
+**Última actualización**: 10 de septiembre de 2026  
+**Versión del documento**: 3.2  
+**Versión del código**: 1.1.0  
+**Versión del experimento**: 1.1.0  
+**Estado**: ✅ Versión estable | ✅ Triggers documentados y actualizados

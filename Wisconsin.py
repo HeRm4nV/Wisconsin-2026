@@ -42,7 +42,7 @@ from pygame.locals import (
 # Debug flag:
 # - If True: print information and save intermediate files
 # - If False: silent execution, minimal output
-debug = False
+debug = True
 fast_debug_test = False  # If True, skips waiting for user input and runs through the experiment quickly for testing purposes
 
 # Base directory of the script
@@ -148,28 +148,48 @@ translate_helper = {
 }
 
 # ==============================
-# Experiment Metadata
-# ==============================
-
-EXPERIMENT_NAME = "Wisconsin_Experiment"
-EXPERIMENT_VERSION = "0.1"
-PYTHON_VERSION = "3.11"
-
-# Timestamp used for file naming and session identification
-SESSION_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-# ==============================
 # Deck Configuration
 # ==============================
 
-DECK_SIZE = 60
+first_version = False  # Flag to indicate if this is the first version of the experiment
+
+MAX_TYPE_A = 24 # Maximum number of single cards (type A) don't modify this value
+MAX_TYPE_B = 36 # Maximum number of double cards (type B) don't modify this value
+
 TOTAL_BLOCKS = 4
-TRIALS_PER_BLOCK = 105
-SERIES_DISTRIBUTION = {
-    6: 5,   # five series of size 6
-    7: 5,   # five series of size 7
-    8: 5    # five series of size 8
-}
+
+if first_version:
+    SERIES_DISTRIBUTION = {
+        6: 5,   # five series of size 6
+        7: 5,   # five series of size 7
+        8: 5    # five series of size 8
+    }
+    PERCENTAGE = [2, 3] # Percentage of singles and doubles in the deck (2:3 ratio)
+else:
+    SERIES_DISTRIBUTION = {
+        5: 6,   # six series of size 5
+        6: 6,   # six series of size 6
+        7: 6    # six series of size 7
+    }
+    PERCENTAGE = [1, 1] # Percentage of singles and doubles in the deck (2:3 ratio)
+
+SERIES_PER_BLOCK = sum(SERIES_DISTRIBUTION.values())
+TRIALS_PER_BLOCK = sum(size * count for size, count in SERIES_DISTRIBUTION.items())
+
+# Calculate the limiting factor for the deck sizes based on the maximum allowed cards
+factor_A = MAX_TYPE_A / PERCENTAGE[0]
+factor_B = MAX_TYPE_B / PERCENTAGE[1]
+
+# Determine the limiting factor to ensure we don't exceed the maximum allowed cards
+limiting_factor = min(factor_A, factor_B)
+
+# Calculate the actual number of cards for each type based on the limiting factor
+cards_A = int(PERCENTAGE[0] * limiting_factor)
+cards_B = int(PERCENTAGE[1] * limiting_factor)
+
+DECK_SIZE = cards_A + cards_B
+
+MANDATORY_SINGLES_PER_SERIES = 3
 
 # ==============================
 # Define deck sizes per block
@@ -180,6 +200,17 @@ deck_sizes_per_block = [
     [30, 60, 15],      # Block 3
     [45, 60]           # Block 4
 ]
+
+# ==============================
+# Experiment Metadata
+# ==============================
+
+EXPERIMENT_NAME = "Wisconsin_Experiment"
+EXPERIMENT_VERSION = "1.1.0"
+PYTHON_VERSION = "3.11"
+
+# Timestamp used for file naming and session identification
+SESSION_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # ==============================
 # Exceptions
@@ -908,7 +939,7 @@ def initialize_series(series_stacks, cut, deck_cursor):
     """
     Initialize series for a given cut using DeckCursor.
     1) Reserve only the proportional singles and doubles needed for this cut.
-    2) Add 2 mandatory singles to empty series within cut.
+    2) Add mandatory singles to empty series within cut.
     3) Mix remaining singles with doubles and fill the series.
     4) Return leftover singles and doubles for the next mazo.
 
@@ -930,6 +961,8 @@ def initialize_series(series_stacks, cut, deck_cursor):
     total_singles_in_cursor = len(deck_cursor.singles_pool)
     total_doubles_in_cursor = len(deck_cursor.doubles_pool)
     total_cards_in_cursor = total_singles_in_cursor + total_doubles_in_cursor
+
+    print(f"[DEBUG] DeckCursor state before cut {cut['deck_index'] + 1}: Singles={total_singles_in_cursor}, Doubles={total_doubles_in_cursor}, Total={total_cards_in_cursor}") if debug else None
 
     if deck_size_to_use > total_cards_in_cursor:
         raise RuntimeError(
@@ -977,14 +1010,15 @@ def initialize_series(series_stacks, cut, deck_cursor):
 
         elif not serie["initialized"] and serie_index == to_series:
             # If the last series in the cut is empty, we can only add 1 mandatory single to avoid overfilling
-            if series_tracking_counter == deck_size_to_use - 1:
-                serie["order"].append(current_singles.pop(0))
+            if series_tracking_counter > deck_size_to_use - MANDATORY_SINGLES_PER_SERIES:
+                for _ in range(deck_size_to_use - series_tracking_counter):
+                    serie["order"].append(current_singles.pop(0))
                 if debug:
-                    print(f"[DEBUG] Last series in cut {cut['deck_index'] + 1} can only take 1 mandatory single to avoid overfilling")
+                    print(f"[DEBUG] Last series in cut {cut['deck_index'] + 1} can only take {deck_size_to_use - series_tracking_counter} mandatory single to avoid overfilling")
             else:
-                for _ in range(2):
+                for _ in range(MANDATORY_SINGLES_PER_SERIES):
                     if not current_singles:
-                        raise RuntimeError("Not enough Singles for mandatory 2 per series")
+                        raise RuntimeError(f"Not enough Singles for mandatory {MANDATORY_SINGLES_PER_SERIES} per series")
                     serie["order"].append(current_singles.pop(0))
                 series_tracking_counter += series_stacks[serie_index]["serie_size"]
                 serie["initialized"] = True
@@ -1026,22 +1060,50 @@ def block_creation():
     # Final array of series stacks for all blocks
     list_of_all_blocks_series_stacks = []
 
+
+    # Dinamically generate deck sizes for each block based on the total number of trials and the deck size
+    deck_sizes_per_block = []
+    current_deck_remaining = DECK_SIZE
+
+    for _ in range(TOTAL_BLOCKS):
+        block = []
+        trials_needed = TRIALS_PER_BLOCK
+    
+        while trials_needed > 0:
+            # if the current deck has enough cards to fill the remaining trials, use it
+            if current_deck_remaining >= trials_needed:
+                block.append(trials_needed)
+                current_deck_remaining -= trials_needed
+                # if the current deck is exhausted, reset it for the next block
+                if current_deck_remaining == 0:
+                    current_deck_remaining = DECK_SIZE
+                trials_needed = 0  # El bloque se completó
+            else:
+                # if the current deck does not have enough cards, use it all and open a new deck
+                block.append(current_deck_remaining)
+                trials_needed -= current_deck_remaining
+                # reset the current deck for the next iteration
+                current_deck_remaining = DECK_SIZE
+                
+        deck_sizes_per_block.append(block)
+
     # ==============================
     # Validate deck sizes
     # ==============================
     for block_index, deck_sizes in enumerate(deck_sizes_per_block):
-        if sum(deck_sizes) != 105:
+        if sum(deck_sizes) != TRIALS_PER_BLOCK:
             raise RuntimeError(
                 f"Invalid deck sizes in block {block_index + 1}: "
-                f"sum is {sum(deck_sizes)}, expected 105"
+                f"sum is {sum(deck_sizes)}, expected {TRIALS_PER_BLOCK}"
             )
 
     # ==============================
     # Generate series sizes per block
     # ==============================
+
     series_sizes_per_block = []
-    for _ in range(4):
-        sizes = [6] * 5 + [7] * 5 + [8] * 5
+    for _ in range(TOTAL_BLOCKS):
+        sizes = [size for size, count in SERIES_DISTRIBUTION.items() for _ in range(count)]
         shuffle(sizes)
         series_sizes_per_block.append(sizes)
 
@@ -1049,7 +1111,7 @@ def block_creation():
     # Build deck cut plans per block
     # ==============================
     all_blocks_deck_plans = []
-    for block_index in range(4):
+    for block_index in range(TOTAL_BLOCKS):
         deck_plan = build_deck_plan(
             series_sizes=series_sizes_per_block[block_index],
             deck_sizes=deck_sizes_per_block[block_index]
@@ -1071,7 +1133,7 @@ def block_creation():
         structure_file_path = temp_path / "debug_blocks_structure.txt"
         with open(structure_file_path, "w", encoding="utf-8") as f:
             f.write("Global Blocks Structure\n\n")
-            for block_index in range(4):
+            for block_index in range(TOTAL_BLOCKS):
                 f.write(f"Estructura del bloque {block_index + 1}\n\n")
                 series_sizes = series_sizes_per_block[block_index]
                 deck_plan = all_blocks_deck_plans[block_index]
@@ -1099,7 +1161,7 @@ def block_creation():
         # ==============================
         # Process each block
         # ==============================
-        for block_index in range(4):
+        for block_index in range(TOTAL_BLOCKS):
             series_sizes = series_sizes_per_block[block_index]
             deck_plan = all_blocks_deck_plans[block_index]
 
@@ -1109,6 +1171,9 @@ def block_creation():
                 for i, size in enumerate(series_sizes)
             ]
 
+            print(f"[DEBUG] Processing Block {block_index + 1} with {len(deck_plan)} mazos") if debug else None
+            print(deck_plan) if debug else None
+
             # Process each deck cut (mazo)
             for cut in deck_plan:
                 if leftover_singles or leftover_doubles:
@@ -1116,7 +1181,11 @@ def block_creation():
                     leftover_singles = []
                     leftover_doubles = []
                 else:
-                    deck_cursor = DeckCursor(single_images_list, double_images_list)
+                    shuffle(single_images_list)
+                    shuffle(double_images_list)
+                    print(f"[DEBUG] DeckCursor initialized for cut {cut['deck_index'] + 1} with {len(single_images_list[:cards_A])} singles and {len(double_images_list[:cards_B])} doubles") if debug else None
+                    
+                    deck_cursor = DeckCursor(single_images_list[:cards_A], double_images_list[:cards_B])
 
                 leftover_singles, leftover_doubles = initialize_series(
                     series_stacks, cut, deck_cursor
@@ -1149,12 +1218,11 @@ def block_creation():
 def trial_block_creation():
     """
     Generate a single block of series stacks for testing purposes.
-    This function creates a simplified version of the block creation process,
-    generating 15 series with random types and 6-8 images each, without
+    This function creates a simplified version of the block creation process, without
     the complex deck cutting and card assignment logic.
 
     Returns:
-        list[dict]: A list of 15 series stacks with randomized types and image orders.
+        list[dict]: A list of series stacks with randomized types and image orders.
     """
     base_types = ["number", "color", "figure"]
     shuffle(base_types)
@@ -1167,7 +1235,8 @@ def trial_block_creation():
     trial_types = []
 
     for i in range(2):
-        serie_size = randint(6, 8)
+        # from SERIES_DISTRIBUTION, we take 2 sizes, the smallest and the largest, to create a balanced test block
+        serie_size = randint(min(SERIES_DISTRIBUTION.keys()), max(SERIES_DISTRIBUTION.keys()))
         serie_type = base_types[i]  # Rotate through types for balance
         image_order = [images_to_use.pop() for _ in range(serie_size)]  # Take random images for the series
         trial_types.append(serie_type)
@@ -1188,18 +1257,18 @@ def generate_series_types_for_block():
 
     Rules:
     - There are 3 types: "number", "color", "figure".
-    - Each block has 15 series total (5 iterations of the 3 types).
+    - Each block has variable number of series stored in SERIES_PER_BLOCK variable.
     - Each iteration shuffles the 3 types.
     - The first element of a new iteration cannot be equal to
       the last element already added to the global list.
 
     Returns:
-        list[str]: A list of 15 elements with balanced and ordered types.
+        list[str]: A list of elements with balanced and ordered types.
     """
     base_types = ["number", "color", "figure"]
     final_types = []
 
-    for _ in range(5):
+    for _ in range(SERIES_PER_BLOCK // len(base_types)):
         current_types = base_types.copy()
         shuffle(current_types)
 
@@ -1282,6 +1351,8 @@ def main():
 
     # Block series stacks generation and debug files
     block_stacks = block_creation()
+
+    print(block_stacks) if debug else None
 
     paragraph(select_slide('instructions'), key = K_SPACE, no_foot = False)
     paragraph(select_slide('pretrial'), key = K_SPACE, no_foot = False)
