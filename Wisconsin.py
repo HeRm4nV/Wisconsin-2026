@@ -42,7 +42,7 @@ from pygame.locals import (
 # Debug flag:
 # - If True: print information and save intermediate files
 # - If False: silent execution, minimal output
-debug = True
+debug = False
 fast_debug_test = False  # If True, skips waiting for user input and runs through the experiment quickly for testing purposes
 
 # Base directory of the script
@@ -171,7 +171,9 @@ else:
         6: 6,   # six series of size 6
         7: 6    # six series of size 7
     }
-    PERCENTAGE = [1, 1] # Percentage of singles and doubles in the deck (2:3 ratio)
+    PERCENTAGE = [1, 1] # Percentage of singles and doubles in the deck (1:1 ratio)
+
+MANDATORY_SINGLES_PER_SERIES = 3
 
 SERIES_PER_BLOCK = sum(SERIES_DISTRIBUTION.values())
 TRIALS_PER_BLOCK = sum(size * count for size, count in SERIES_DISTRIBUTION.items())
@@ -188,8 +190,6 @@ cards_A = int(PERCENTAGE[0] * limiting_factor)
 cards_B = int(PERCENTAGE[1] * limiting_factor)
 
 DECK_SIZE = cards_A + cards_B
-
-MANDATORY_SINGLES_PER_SERIES = 3
 
 # ==============================
 # Define deck sizes per block
@@ -378,7 +378,8 @@ def send_trigger(trigger):
     """Sends a trigger via serial port."""
     try:
         ser.write((trigger).to_bytes(1, 'little'))
-        print(f'Trigger {trigger} sent')
+        if debug:
+            print(f'[DEBUG] Trigger {trigger} sent')
     except Exception:
         print(f'Failed to send trigger {trigger}')
 
@@ -444,11 +445,12 @@ def select_slide(slide_name, variables=None):
             u"¡Bien hecho! Has completado el bloque de práctica.",
             "",
             u"Como pudiste ver, en este bloque de práctica primero tuviste que responder",
-            u"dependiendo del " + translate_helper[variables["trial_types"][0]] + " y luego del " + translate_helper[variables["trial_types"][1]],
-            "",
+            u"dependiendo del " + translate_helper[variables["trial_types"][0]] + " y luego del " + translate_helper[variables["trial_types"][1]]
+        ],
+        'first_block': [
             u"Ahora comenzaremos con el bloque 1.", 
             "",
-            u"Recuerda que la regla puede cambiar en cualquier momento,", 
+            u"Recuerda que la regla puede cambiar en cualquier momento,",
             u"así que presta atención a la retroalimentación."
         ],
         'break': [
@@ -1363,6 +1365,8 @@ def main():
     paragraph(select_slide('posttrial', variables={"blockNumber": 0, "practice": True, "trial_types": trial_types}), key = K_SPACE, no_foot = False)
 
     send_trigger(trigger_helper["start_experiment"])
+
+    paragraph(select_slide('first_block', variables={"blockNumber": 0, "practice": True, "trial_types": trial_types}), key = K_SPACE, no_foot = False)
 
     for block_number, block in enumerate(block_stacks):
         series_types = generate_series_types_for_block()
